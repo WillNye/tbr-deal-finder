@@ -1,17 +1,37 @@
 import asyncio
 import os.path
 from datetime import datetime
-from typing import Union
+from textwrap import dedent
 import readline  # type: ignore
 
 
 import audible
+from audible.login import playwright_external_login_url_callback
 
 from tbr_deal_finder import TBR_DEALS_PATH
 from tbr_deal_finder.seller.models import Seller
 from tbr_deal_finder.book import Book, BookFormat
 
 _AUTH_PATH = TBR_DEALS_PATH.joinpath("audible.json")
+
+
+def login_url_callback(url: str) -> str:
+    """Helper function for login with external browsers."""
+    try:
+        return playwright_external_login_url_callback(url)
+    except ImportError:
+        pass
+
+    message = f"""\
+        Please copy the following url and insert it into a web browser of your choice to log into Amazon.
+        Note: your browser will show you an error page (Page not found). This is expected.
+        
+        {url}
+
+        Once you have logged in, please insert the copied url.
+    """
+    print(dedent(message))
+    return input()
 
 
 class Audible(Seller):
@@ -73,7 +93,10 @@ class Audible(Seller):
 
     async def set_auth(self):
         if not os.path.exists(_AUTH_PATH):
-            auth = audible.Authenticator.from_login_external(locale="us")
+            auth = audible.Authenticator.from_login_external(
+                locale="us",
+                login_url_callback=login_url_callback
+            )
 
             # Save credentials to file
             auth.to_file(_AUTH_PATH)
