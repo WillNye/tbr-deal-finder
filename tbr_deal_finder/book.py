@@ -3,8 +3,6 @@ from datetime import datetime
 from enum import Enum
 from typing import Optional, Union
 
-import pandas as pd
-
 from tbr_deal_finder.utils import get_duckdb_conn, execute_query, get_query_by_name
 
 class BookFormat(Enum):
@@ -86,45 +84,6 @@ def get_active_deals() -> list[Book]:
         get_query_by_name("get_active_deals.sql")
     )
     return [Book(**book) for book in query_response]
-
-
-def update_deals(new_deals: list[Book]):
-    """Adds new deals to the database and marks old deals as deleted
-
-    :param new_deals:
-    """
-
-    # This could be done using a temp table for the new deals, but that feels like overkill
-    # I can't imagine there's ever going to be more than 5,000 books in someone's TBR
-    # If it were any larger we'd have bigger problems.
-    active_deal_map = {deal.deal_id: deal for deal in get_active_deals()}
-    # Dirty trick to ensure uniqueness in request
-    new_deals = list({nd.deal_id: nd for nd in new_deals}.values())
-    df_data = []
-
-    for deal in new_deals:
-        if deal.deal_id in active_deal_map:
-            if deal.current_price != active_deal_map[deal.deal_id].current_price:
-                df_data.append(deal.dict())
-
-            active_deal_map.pop(deal.deal_id)
-        else:
-            df_data.append(deal.dict())
-
-    # Any remaining values in active_deal_map mean that
-    # it wasn't found and should be marked for deletion
-    for deal in active_deal_map.values():
-        print(f"{str(deal)} is no longer active")
-        deal.deleted = True
-        df_data.append(deal.dict())
-
-    if df_data:
-        df = pd.DataFrame(df_data)
-
-        db_conn = get_duckdb_conn()
-        db_conn.register("_df", df)
-        db_conn.execute("INSERT INTO seller_deal SELECT * FROM _df;")
-        db_conn.unregister("_df")
 
 
 def print_books(books: list[Book]):
