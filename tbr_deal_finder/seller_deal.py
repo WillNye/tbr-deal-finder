@@ -12,7 +12,7 @@ from tbr_deal_finder.seller.models import Seller
 from tbr_deal_finder.utils import get_duckdb_conn
 
 
-def update_seller_deal_table(new_deals: list[Book]):
+def update_seller_deal_table(config: Config, new_deals: list[Book]):
     """Adds new deals to the database and marks old deals as deleted
 
     :param new_deals:
@@ -39,6 +39,7 @@ def update_seller_deal_table(new_deals: list[Book]):
     # it wasn't found and should be marked for deletion
     for deal in active_deal_map.values():
         print(f"{str(deal)} is no longer active")
+        deal.timepoint = config.run_time
         deal.deleted = True
         df_data.append(deal.dict())
 
@@ -117,11 +118,11 @@ async def get_latest_deals(config: Config):
             print("---------------\n")
             print(f"Getting deals from {seller.name}")
             print("\n---------------")
-            books.extend(await _get_books(config, seller, tbr_books[:10]))
+            books.extend(await _get_books(config, seller, tbr_books))
 
         checked_deals.update(
             {_get_deal_base(b.title, b.authors) for b in books}
         )
         print("---------------\n")
 
-    update_seller_deal_table(books)
+    update_seller_deal_table(config, books)
