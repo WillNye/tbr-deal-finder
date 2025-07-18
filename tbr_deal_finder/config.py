@@ -1,6 +1,7 @@
 import configparser
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Union
 
 from tbr_deal_finder import TBR_DEALS_PATH
 
@@ -31,7 +32,9 @@ class Config:
 
     def __post_init__(self):
         if isinstance(self.story_graph_export_paths, str):
-            self.story_graph_export_paths = [i.strip() for i in self.story_graph_export_paths.split(",")]
+            self.set_story_graph_export_paths(
+                self.story_graph_export_paths.split(",")
+            )
 
     @classmethod
     def currency_symbol(cls) -> str:
@@ -58,6 +61,16 @@ class Config:
             story_graph_export_paths=[i.strip() for i in export_paths_str.split(",")]
         )
 
+    @property
+    def story_graph_export_paths_str(self) -> str:
+        return ", ".join(self.story_graph_export_paths)
+
+    def set_story_graph_export_paths(self, story_graph_export_paths: Union[str, list[str]]):
+        if isinstance(story_graph_export_paths, str):
+            self.story_graph_export_paths = [i.strip() for i in story_graph_export_paths.split(",")]
+        else:
+            self.story_graph_export_paths = story_graph_export_paths
+
     def save(self):
         """Save configuration to file."""
         parser = configparser.ConfigParser()
@@ -65,7 +78,7 @@ class Config:
             'max_price': str(self.max_price),
             'min_discount': str(self.min_discount),
             'locale': type(self).locale,
-            'story_graph_export_paths': ", ".join(self.story_graph_export_paths)
+            'story_graph_export_paths': self.story_graph_export_paths_str
         }
         
         with open(_CONFIG_PATH, 'w') as f:
