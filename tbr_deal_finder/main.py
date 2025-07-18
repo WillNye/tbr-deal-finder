@@ -20,8 +20,33 @@ def main():
         
         # Prompt for config values
         story_graph_export_paths = click.prompt("Enter the paths to your StoryGraph export CSV file as a comma-separated list")
+        
+        # Locale selection
+        locale_options = [
+            ("US and all other countries not listed", "us"),
+            ("Canada", "ca"),
+            ("UK and Ireland", "uk"),
+            ("Australia and New Zealand", "au"),
+            ("France, Belgium, Switzerland", "fr"),
+            ("Germany, Austria, Switzerland", "de"),
+            ("Japan", "jp"),
+            ("Italy", "it"),
+            ("India", "in"),
+            ("Spain", "es"),
+            ("Brazil", "br"),
+        ]
+        click.echo("Select your locale:")
+        for idx, (desc, code) in enumerate(locale_options, 1):
+            click.echo(f"  {idx}. {desc} [{code}]")
+        locale_choice = click.prompt(
+            "Enter the number corresponding to your locale",
+            type=click.IntRange(1, len(locale_options)),
+            default=1
+        )
+        locale = locale_options[locale_choice - 1][1]
+        
         max_price = click.prompt(
-            "Enter maximum price for deals (in dollars)",
+            "Enter maximum price for deals",
             type=float,
             default=8.0
         )
@@ -33,6 +58,7 @@ def main():
         
         config = Config(
             story_graph_export_paths=story_graph_export_paths,
+            locale=locale,
             max_price=max_price,
             min_discount=min_discount
         )

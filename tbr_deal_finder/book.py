@@ -3,6 +3,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Optional, Union
 
+from tbr_deal_finder.config import Config
 from tbr_deal_finder.utils import get_duckdb_conn, execute_query, get_query_by_name
 
 class BookFormat(Enum):
@@ -39,7 +40,7 @@ class Book:
 
     @staticmethod
     def price_to_string(price: float) -> str:
-        return f"${price:.2f}"
+        return f"{Config.currency_symbol()}{price:.2f}"
 
     @property
     def title_id(self) -> str:

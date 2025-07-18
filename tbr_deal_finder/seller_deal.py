@@ -117,7 +117,7 @@ async def get_latest_deals(config: Config):
             print("---------------\n")
             print(f"Getting deals from {seller.name}")
             print("\n---------------")
-            books.extend(await _get_books(config, seller, tbr_books))
+            books.extend(await _get_books(config, seller, tbr_books[:10]))
 
         checked_deals.update(
             {_get_deal_base(b.title, b.authors) for b in books}

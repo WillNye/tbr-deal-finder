@@ -9,6 +9,7 @@ import audible
 from audible.login import playwright_external_login_url_callback
 
 from tbr_deal_finder import TBR_DEALS_PATH
+from tbr_deal_finder.config import Config
 from tbr_deal_finder.seller.models import Seller
 from tbr_deal_finder.book import Book, BookFormat
 
@@ -122,7 +123,7 @@ class Audible(Seller):
     async def set_auth(self):
         if not os.path.exists(_AUTH_PATH):
             auth = audible.Authenticator.from_login_external(
-                locale="us",
+                locale=Config.locale,
                 login_url_callback=login_url_callback
             )
 

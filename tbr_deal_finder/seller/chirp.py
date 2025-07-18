@@ -10,6 +10,7 @@ from tbr_deal_finder.utils import currency_to_float
 
 
 class Chirp(Seller):
+    # Static because url for other locales just redirects to .com
     _url: str = "https://www.chirpbooks.com/api/graphql"
 
     @property
