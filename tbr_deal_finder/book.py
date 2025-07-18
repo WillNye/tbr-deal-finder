@@ -24,6 +24,7 @@ class Book:
     deleted: bool = False
 
     deal_id: Optional[str] = None
+    exists: bool = True
 
     def __post_init__(self):
         if not self.deal_id:
@@ -63,6 +64,8 @@ class Book:
     def dict(self):
         response = dataclasses.asdict(self)
         response["format"] = self.format.value
+        del response["exists"]
+
         return response
 
 

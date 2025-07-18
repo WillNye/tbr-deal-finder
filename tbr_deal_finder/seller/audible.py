@@ -42,9 +42,9 @@ class Audible(Seller):
     def name(self) -> str:
         return "Audible"
 
-    async def get_audio_book(
+    async def get_book(
             self, title: str, authors: str, runtime: datetime, semaphore: asyncio.Semaphore
-    ) -> Union[Book, None]:
+    ) -> Book:
         async with semaphore:
             match = await self._client.get(
                 "1.0/catalog/products",
@@ -57,8 +57,16 @@ class Audible(Seller):
             )
 
             if not match["products"]:
-                print(f"{title} - {authors} - Not Found")
-                return None
+                return Book(
+                    seller=self.name,
+                    title=title,
+                    authors=authors,
+                    list_price=0,
+                    current_price=0,
+                    timepoint=runtime,
+                    format=BookFormat.AUDIOBOOK,
+                    exists=False,
+                )
 
             for product in match["products"]:
                 if product["title"] != title:
@@ -74,22 +82,42 @@ class Audible(Seller):
                     format=BookFormat.AUDIOBOOK
                 )
 
+            """ Maybe enable but the false positives could wind up doing more harm than good
             default_product = match["products"][0]
+            
             if title.strip().lower() not in default_product["title"].strip().lower():
-                print(f"{title} - {authors} - Not Found")
-                return None
+                return Book(
+                    seller=self.name,
+                    title=title,
+                    authors=authors,
+                    list_price=0,
+                    current_price=0,
+                    timepoint=runtime,
+                    format=BookFormat.AUDIOBOOK,
+                    exists=False,
+                )
 
-            # return Book(
-            #     seller=self.name,
-            #     title=title,
-            #     authors=authors,
-            #     list_price=default_product["price"]["list_price"]["base"],
-            #     current_price=default_product["price"]["lowest_price"]["base"],
-            #     timepoint=runtime,
-            #     format=BookFormat.AUDIOBOOK
-            # )
-            print(f"{title} - {authors} - Not Found")
-            return None
+            return Book(
+                seller=self.name,
+                title=title,
+                authors=authors,
+                list_price=default_product["price"]["list_price"]["base"],
+                current_price=default_product["price"]["lowest_price"]["base"],
+                timepoint=runtime,
+                format=BookFormat.AUDIOBOOK
+            )
+            """
+
+            return Book(
+                seller=self.name,
+                title=title,
+                authors=authors,
+                list_price=0,
+                current_price=0,
+                timepoint=runtime,
+                format=BookFormat.AUDIOBOOK,
+                exists=False,
+            )
 
     async def set_auth(self):
         if not os.path.exists(_AUTH_PATH):

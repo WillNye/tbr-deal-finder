@@ -16,9 +16,9 @@ class Chirp(Seller):
     def name(self) -> str:
         return "Chirp"
 
-    async def get_audio_book(
+    async def get_book(
         self, title: str, authors: str, runtime: datetime, semaphore: asyncio.Semaphore
-    ) -> Union[Book, None]:
+    ) -> Book:
 
         async with aiohttp.ClientSession() as http_client:
             response = await http_client.request(
@@ -33,8 +33,16 @@ class Chirp(Seller):
             response_body = await response.json()
             audiobooks = response_body["data"]["audiobooks"]["objects"]
             if not audiobooks:
-                print(f"{title} - {authors} - Not Found")
-                return None
+                return Book(
+                    seller=self.name,
+                    title=title,
+                    authors=authors,
+                    list_price=0,
+                    current_price=0,
+                    timepoint=runtime,
+                    format=BookFormat.AUDIOBOOK,
+                    exists=False,
+                )
 
             for book in audiobooks:
                 if not book["currentProduct"]:
@@ -51,8 +59,16 @@ class Chirp(Seller):
                         format=BookFormat.AUDIOBOOK,
                     )
 
-            print(f"{title} - {authors} - Not Found")
-            return None
+            return Book(
+                seller=self.name,
+                title=title,
+                authors=authors,
+                list_price=0,
+                current_price=0,
+                timepoint=runtime,
+                format=BookFormat.AUDIOBOOK,
+                exists=False,
+            )
 
     async def set_auth(self):
         return

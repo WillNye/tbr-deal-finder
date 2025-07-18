@@ -13,9 +13,9 @@ class Seller(abc.ABC):
     def name(self) -> str:
         raise NotImplementedError
 
-    async def get_audio_book(
+    async def get_book(
             self, title: str, authors: str, runtime: datetime, semaphore: asyncio.Semaphore
-    ) -> Union[Book, None]:
+    ) -> Book:
         """
         Get book information from the provider.
         
@@ -25,7 +25,7 @@ class Seller(abc.ABC):
             semaphore: Semaphore for rate limiting
             
         Returns:
-            Book object if found, None otherwise
+            Book object, if not found Book.exists will be false
             :param title:
             :param authors:
             :param semaphore:

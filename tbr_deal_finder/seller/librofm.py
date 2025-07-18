@@ -10,7 +10,7 @@ import click
 
 from tbr_deal_finder import TBR_DEALS_PATH
 from tbr_deal_finder.seller.models import Seller
-from tbr_deal_finder.book import Book
+from tbr_deal_finder.book import Book, BookFormat
 
 
 class LibroFM(Seller):
@@ -69,9 +69,9 @@ class LibroFM(Seller):
         with open(auth_path, "w") as f:
             json.dump(response, f)
 
-    async def get_audio_book(
+    async def get_book(
         self, title: str, authors: str, runtime: datetime, semaphore: asyncio.Semaphore
-    ) -> Union[Book, None]:
+    ) -> Book:
         # TODO: Move isbn to param
         isbn = "9780063355095"
 
@@ -80,3 +80,13 @@ class LibroFM(Seller):
             "GET"
         )
         # TODO: Parse response and set Book
+        return Book(
+            seller=self.name,
+            title=title,
+            authors=authors,
+            list_price=0,
+            current_price=0,
+            timepoint=runtime,
+            format=BookFormat.AUDIOBOOK,
+            exists=False,
+        )
