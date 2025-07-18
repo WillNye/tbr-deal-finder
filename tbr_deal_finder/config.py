@@ -39,7 +39,7 @@ class Config:
         parser['DEFAULT'] = {
             'max_price': str(self.max_price),
             'min_discount': str(self.min_discount),
-            'story_graph_export_paths': self.story_graph_export_paths
+            'story_graph_export_paths': ", ".join(self.story_graph_export_paths)
         }
         
         with open(_CONFIG_PATH, 'w') as f:

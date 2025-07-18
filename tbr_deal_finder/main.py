@@ -3,6 +3,7 @@ import csv
 
 import click
 from tqdm import tqdm
+from tqdm.asyncio import tqdm_asyncio
 
 from tbr_deal_finder.audio_isbn import set_book_audio_isbn
 from tbr_deal_finder.config import Config
@@ -31,19 +32,27 @@ async def _get_books(config, seller: Seller, books: list[dict]) -> list[Book]:
     """Get Books with limited concurrency."""
     semaphore = asyncio.Semaphore(10)
     response = []
+    unresolved_books = []
 
     tasks = [
-        seller.get_audio_book(book["Title"], book["Authors"], config.run_time, semaphore)
+        seller.get_book(book["Title"], book["Authors"], config.run_time, semaphore)
         for book in books
         if book["Read Status"] == "to-read"
     ]
-    results = await asyncio.gather(*tasks)
+    results = await tqdm_asyncio.gather(*tasks, desc=f"Getting latest prices from {seller.name}")
     for book in results:
-        if book and book.current_price <= config.max_price and book.discount() >= config.min_discount:
+        if book.exists and book.current_price <= config.max_price and book.discount() >= config.min_discount:
             response.append(book)
+        elif not book.exists:
+            unresolved_books.append(book)
 
     if retry_books := _retry_books(response, books):
+        print("Attempting to find missing books with alternate title")
         response.extend(await _get_books(config, seller, retry_books))
+    elif unresolved_books:
+        print()
+        for book in unresolved_books:
+            print(f"{book.title} by {book.authors} not found")
 
     return response
 
