@@ -15,6 +15,7 @@ from tbr_deal_finder.utils import get_duckdb_conn
 def update_seller_deal_table(config: Config, new_deals: list[Book]):
     """Adds new deals to the database and marks old deals as deleted
 
+    :param config:
     :param new_deals:
     """
 
@@ -110,6 +111,7 @@ async def get_latest_deals(config: Config):
             tbr_books: list[dict] = [
                 book for book in csv.DictReader(file)
                 if _get_deal_base(book["Title"], book["Authors"]) not in checked_deals
+                   and book["Owned?"] == "No"
             ]  # type: ignore
 
         for seller in [Audible(), Chirp()]:
