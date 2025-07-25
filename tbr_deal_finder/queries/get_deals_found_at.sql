@@ -1,4 +1,4 @@
 SELECT *
-FROM seller_deal
+FROM retailer_deal
 WHERE timepoint = $timepoint AND deleted IS NOT TRUE
-ORDER BY title, authors, seller, format
+ORDER BY title, authors, retailer, format

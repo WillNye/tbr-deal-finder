@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import List, Dict
 from collections import defaultdict
 
+import click
 import duckdb
 
 from tbr_deal_finder.utils import get_duckdb_conn
@@ -17,11 +18,11 @@ class TableMigration:
 _MIGRATIONS = [
     TableMigration(
         version=1,
-        table_name="seller_deal",
+        table_name="retailer_deal",
         sql="""
-            CREATE TABLE seller_deal
+            CREATE TABLE retailer_deal
             (
-                seller          VARCHAR,
+                retailer          VARCHAR,
                 title           VARCHAR,
                 authors         VARCHAR,
                 list_price      FLOAT,
@@ -32,13 +33,25 @@ _MIGRATIONS = [
                 deal_id         VARCHAR
             );
             """
-    )
+    ),
+    TableMigration(
+        version=1,
+        table_name="latest_deal_run_history",
+        sql="""
+            CREATE TABLE latest_deal_run_history
+            (
+                timepoint           TIMESTAMP_NS,
+                ran_successfully    BOOLEAN,
+                details             VARCHAR
+            );
+            """
+    ),
 ]
 
 
 def apply_migration(migration: TableMigration, cursor: duckdb.DuckDBPyConnection) -> None:
     """Apply a single migration to the database."""
-    print(
+    click.echo(
         f"Applying migration - version: {migration.version}, table: {migration.table_name}"
     )
 
@@ -53,7 +66,7 @@ def apply_migration(migration: TableMigration, cursor: duckdb.DuckDBPyConnection
                        UPDATE SET version = EXCLUDED.version
                        """, (migration.table_name, migration.version))
 
-        print(
+        click.echo(
             f"Migration applied successfully - version: {migration.version}, table: {migration.table_name}"
         )
 
