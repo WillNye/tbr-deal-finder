@@ -1,15 +1,14 @@
 import asyncio
 from datetime import datetime
-from typing import Union
 
 import aiohttp
 
-from tbr_deal_finder.seller.models import Seller
-from tbr_deal_finder.book import Book, BookFormat
+from tbr_deal_finder.retailer.models import Retailer
+from tbr_deal_finder.book import Book, BookFormat, get_normalized_authors
 from tbr_deal_finder.utils import currency_to_float
 
 
-class Chirp(Seller):
+class Chirp(Retailer):
     # Static because url for other locales just redirects to .com
     _url: str = "https://www.chirpbooks.com/api/graphql"
 
@@ -18,8 +17,10 @@ class Chirp(Seller):
         return "Chirp"
 
     async def get_book(
-        self, title: str, authors: str, runtime: datetime, semaphore: asyncio.Semaphore
+        self, target: Book, runtime: datetime, semaphore: asyncio.Semaphore
     ) -> Book:
+        title = target.title
+        authors = target.authors
 
         async with aiohttp.ClientSession() as http_client:
             response = await http_client.request(
@@ -35,7 +36,7 @@ class Chirp(Seller):
             audiobooks = response_body["data"]["audiobooks"]["objects"]
             if not audiobooks:
                 return Book(
-                    seller=self.name,
+                    retailer=self.name,
                     title=title,
                     authors=authors,
                     list_price=0,
@@ -49,9 +50,12 @@ class Chirp(Seller):
                 if not book["currentProduct"]:
                     continue
 
-                if book["displayTitle"] == title and book["displayAuthors"] in authors:
+                if (
+                    book["displayTitle"] == title
+                    and get_normalized_authors(book["displayAuthors"]) == target.normalized_authors
+                ):
                     return Book(
-                        seller=self.name,
+                        retailer=self.name,
                         title=title,
                         authors=authors,
                         list_price=currency_to_float(book["currentProduct"]["listingPrice"]),
@@ -61,9 +65,9 @@ class Chirp(Seller):
                     )
 
             return Book(
-                seller=self.name,
+                retailer=self.name,
                 title=title,
-                authors=authors,
+                authors=target.authors,
                 list_price=0,
                 current_price=0,
                 timepoint=runtime,

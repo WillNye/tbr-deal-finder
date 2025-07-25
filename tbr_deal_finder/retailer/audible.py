@@ -6,11 +6,12 @@ import readline  # type: ignore
 
 
 import audible
+import click
 from audible.login import playwright_external_login_url_callback
 
 from tbr_deal_finder import TBR_DEALS_PATH
 from tbr_deal_finder.config import Config
-from tbr_deal_finder.seller.models import Seller
+from tbr_deal_finder.retailer.models import Retailer
 from tbr_deal_finder.book import Book, BookFormat
 
 _AUTH_PATH = TBR_DEALS_PATH.joinpath("audible.json")
@@ -31,11 +32,11 @@ def login_url_callback(url: str) -> str:
 
         Once you have logged in, please insert the copied url.
     """
-    print(dedent(message))
+    click.echo(dedent(message))
     return input()
 
 
-class Audible(Seller):
+class Audible(Retailer):
     _auth: audible.Authenticator = None
     _client: audible.AsyncClient = None
 
@@ -44,8 +45,14 @@ class Audible(Seller):
         return "Audible"
 
     async def get_book(
-            self, title: str, authors: str, runtime: datetime, semaphore: asyncio.Semaphore
+        self,
+        target: Book,
+        runtime: datetime,
+        semaphore: asyncio.Semaphore
     ) -> Book:
+        title = target.title
+        authors = target.authors
+
         async with semaphore:
             match = await self._client.get(
                 "1.0/catalog/products",
@@ -59,7 +66,7 @@ class Audible(Seller):
 
             if not match["products"]:
                 return Book(
-                    seller=self.name,
+                    retailer=self.name,
                     title=title,
                     authors=authors,
                     list_price=0,
@@ -74,7 +81,7 @@ class Audible(Seller):
                     continue
 
                 return Book(
-                    seller=self.name,
+                    retailer=self.name,
                     title=title,
                     authors=authors,
                     list_price=product["price"]["list_price"]["base"],
@@ -83,34 +90,8 @@ class Audible(Seller):
                     format=BookFormat.AUDIOBOOK
                 )
 
-            """ Maybe enable but the false positives could wind up doing more harm than good
-            default_product = match["products"][0]
-            
-            if title.strip().lower() not in default_product["title"].strip().lower():
-                return Book(
-                    seller=self.name,
-                    title=title,
-                    authors=authors,
-                    list_price=0,
-                    current_price=0,
-                    timepoint=runtime,
-                    format=BookFormat.AUDIOBOOK,
-                    exists=False,
-                )
-
             return Book(
-                seller=self.name,
-                title=title,
-                authors=authors,
-                list_price=default_product["price"]["list_price"]["base"],
-                current_price=default_product["price"]["lowest_price"]["base"],
-                timepoint=runtime,
-                format=BookFormat.AUDIOBOOK
-            )
-            """
-
-            return Book(
-                seller=self.name,
+                retailer=self.name,
                 title=title,
                 authors=authors,
                 list_price=0,
