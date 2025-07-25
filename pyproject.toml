@@ -1,9 +1,10 @@
 [project]
 name = "tbr-deal-finder"
 version = "0.1.0"
-description = "Add your description here"
+description = "Track price drops and find deals on books in your TBR list across audiobook and ebook formats."
 readme = "README.md"
 requires-python = ">=3.13"
+license = {text = "MIT"}
 dependencies = [
     "aiohttp>=3.12.14",
     "audible>=0.10.0",
@@ -12,4 +13,19 @@ dependencies = [
     "pandas>=2.3.1",
     "questionary>=2.1.0",
     "tqdm>=4.67.1",
+    "unidecode>=1.4.0",
 ]
+
+[project.scripts]
+lotad = "lotad.cli:cli"
+
+[tool.setuptools.package-data]
+"lotad" = [
+    "queries/**/*.sql",
+    "reports/*.j2",
+    "data/*.json"
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
