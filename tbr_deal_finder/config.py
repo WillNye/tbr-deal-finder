@@ -23,7 +23,8 @@ _LOCALE_CURRENCY_MAP = {
 
 @dataclass
 class Config:
-    story_graph_export_paths: list[str]
+    library_export_paths: list[str]
+    tracked_retailers: list[str]
     max_price: float = 8.0
     min_discount: int = 35
     run_time: datetime = datetime.now()
@@ -31,9 +32,14 @@ class Config:
     locale: str = "us"  # This will be set as a class attribute below
 
     def __post_init__(self):
-        if isinstance(self.story_graph_export_paths, str):
-            self.set_story_graph_export_paths(
-                self.story_graph_export_paths.split(",")
+        if isinstance(self.library_export_paths, str):
+            self.set_library_export_paths(
+                self.library_export_paths.split(",")
+            )
+
+        if isinstance(self.tracked_retailers, str):
+            self.set_tracked_retailers(
+                self.tracked_retailers.split(",")
             )
 
     @classmethod
@@ -52,24 +58,36 @@ class Config:
         
         parser = configparser.ConfigParser()
         parser.read(_CONFIG_PATH)
-        export_paths_str = parser.get('DEFAULT', 'story_graph_export_paths')
+        export_paths_str = parser.get('DEFAULT', 'library_export_paths')
+        tracked_retailers_str = parser.get('DEFAULT', 'tracked_retailers')
         locale = parser.get('DEFAULT', 'locale', fallback="us")
         cls.set_locale(locale)
         return cls(
             max_price=parser.getfloat('DEFAULT', 'max_price', fallback=8.0),  
             min_discount=parser.getint('DEFAULT', 'min_discount', fallback=35),
-            story_graph_export_paths=[i.strip() for i in export_paths_str.split(",")]
+            library_export_paths=[i.strip() for i in export_paths_str.split(",")],
+            tracked_retailers=[i.strip() for i in tracked_retailers_str.split(",")]
         )
 
     @property
-    def story_graph_export_paths_str(self) -> str:
-        return ", ".join(self.story_graph_export_paths)
+    def library_export_paths_str(self) -> str:
+        return ", ".join(self.library_export_paths)
 
-    def set_story_graph_export_paths(self, story_graph_export_paths: Union[str, list[str]]):
-        if isinstance(story_graph_export_paths, str):
-            self.story_graph_export_paths = [i.strip() for i in story_graph_export_paths.split(",")]
+    @property
+    def tracked_retailers_str(self) -> str:
+        return ", ".join(self.tracked_retailers)
+
+    def set_library_export_paths(self, library_export_paths: Union[str, list[str]]):
+        if isinstance(library_export_paths, str):
+            self.library_export_paths = [i.strip() for i in library_export_paths.split(",")]
         else:
-            self.story_graph_export_paths = story_graph_export_paths
+            self.library_export_paths = library_export_paths
+
+    def set_tracked_retailers(self, tracked_retailers: Union[str, list[str]]):
+        if isinstance(tracked_retailers, str):
+            self.tracked_retailers = [i.strip() for i in tracked_retailers.split(",")]
+        else:
+            self.tracked_retailers = tracked_retailers
 
     def save(self):
         """Save configuration to file."""
@@ -78,7 +96,8 @@ class Config:
             'max_price': str(self.max_price),
             'min_discount': str(self.min_discount),
             'locale': type(self).locale,
-            'story_graph_export_paths': self.story_graph_export_paths_str
+            'library_export_paths': self.library_export_paths_str,
+            'tracked_retailers': self.tracked_retailers_str
         }
         
         with open(_CONFIG_PATH, 'w') as f:
