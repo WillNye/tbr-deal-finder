@@ -1,6 +1,6 @@
 [project]
 name = "tbr-deal-finder"
-version = "0.1.1"
+version = "0.1.2"
 description = "Track price drops and find deals on books in your TBR list across audiobook and ebook formats."
 readme = "README.md"
 requires-python = ">=3.13"
@@ -17,10 +17,10 @@ dependencies = [
 ]
 
 [project.scripts]
-lotad = "lotad.cli:cli"
+tbr-deal-finder = "tbr-deal-finder.main:cli"
 
 [tool.setuptools.package-data]
-"lotad" = [
+"tbr-deal-finder" = [
     "queries/**/*.sql",
     "reports/*.j2",
     "data/*.json"
