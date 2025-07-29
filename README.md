@@ -89,7 +89,7 @@ tbr-deal-finder setup
 
 #### UV
 ```sh
-uv run -m tbr_deal_finder.main setup
+uv run -m tbr_deal_finder.cli setup
 ```
 
 You will be prompted to:
@@ -114,7 +114,7 @@ tbr-deal-finder [COMMAND]
 
 #### UV
 ```sh
-uv run -m tbr_deal_finder.main [COMMAND]
+uv run -m tbr_deal_finder.cli [COMMAND]
 ```
 
 Example:
@@ -123,7 +123,7 @@ tbr-deal-finder latest-deals
 
 # or
 
-uv run -m tbr_deal_finder.main latest-deals
+uv run -m tbr_deal_finder.cli latest-deals
 ```
 
 ## Updating your TBR

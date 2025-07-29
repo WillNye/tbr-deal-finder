@@ -7,7 +7,7 @@ import readline  # type: ignore
 
 import audible
 import click
-from audible.login import playwright_external_login_url_callback
+from audible.login import build_init_cookies
 
 from tbr_deal_finder import TBR_DEALS_PATH
 from tbr_deal_finder.config import Config
@@ -19,10 +19,41 @@ _AUTH_PATH = TBR_DEALS_PATH.joinpath("audible.json")
 
 def login_url_callback(url: str) -> str:
     """Helper function for login with external browsers."""
+
     try:
-        return playwright_external_login_url_callback(url)
+        from playwright.sync_api import sync_playwright  # type: ignore
+        use_playwright = True
     except ImportError:
-        pass
+        use_playwright = False
+
+    if use_playwright:
+        with sync_playwright() as p:
+            iphone = p.devices["iPhone 12 Pro"]
+            browser = p.webkit.launch(headless=False)
+            context = browser.new_context(
+                **iphone
+            )
+            cookies = []
+            for name, value in build_init_cookies().items():
+                cookies.append(
+                    {
+                        "name": name,
+                        "value": value,
+                        "url": url
+                    }
+                )
+            context.add_cookies(cookies)
+            page = browser.new_page()
+            page.goto(url)
+
+            while True:
+                page.wait_for_timeout(600)
+                if "/ap/maplanding" in page.url:
+                    response_url = page.url
+                    break
+
+            browser.close()
+        return response_url
 
     message = f"""\
         Please copy the following url and insert it into a web browser of your choice to log into Amazon.
