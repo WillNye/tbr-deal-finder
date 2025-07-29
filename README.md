@@ -15,7 +15,7 @@ Track price drops and find deals on books in your TBR (To Be Read) list across a
 ### Audiobooks
 * Audible
 * Chirp
-* Libro.fm (Work in progress)
+* Libro.fm
 
 ### Locales
 * US
