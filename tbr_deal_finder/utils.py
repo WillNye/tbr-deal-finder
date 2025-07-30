@@ -42,15 +42,15 @@ def get_query_by_name(file_name: str) -> str:
 
 
 def echo_err(message):
-    click.secho(f'\n❌:  {message}\n', fg='red', bold=True)
+    click.secho(f'\n❌  {message}\n', fg='red', bold=True)
 
 
 def echo_success(message):
-    click.secho(f'\n✅: {message}', fg='green', bold=True)
+    click.secho(f'\n✅  {message}', fg='green', bold=True)
 
 
 def echo_warning(message):
-    click.secho(f'\n⚠️: {message}', fg='yellow')
+    click.secho(f'\n⚠️  {message}', fg='yellow')
 
 
 def echo_info(message):
