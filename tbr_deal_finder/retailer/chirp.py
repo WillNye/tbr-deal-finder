@@ -21,18 +21,19 @@ class Chirp(Retailer):
     ) -> Book:
         title = target.title
         authors = target.authors
+        async with semaphore:
+            async with aiohttp.ClientSession() as http_client:
+                response = await http_client.request(
+                    "POST",
+                    self._url,
+                    json={
+                        "query": "fragment audiobookFields on Audiobook{id averageRating coverUrl displayAuthors displayTitle ratingsCount url allAuthors{name slug url}} fragment audiobookWithShoppingCartAndUserAudiobookFields on Audiobook{...audiobookFields currentUserShoppingCartItem{id}currentUserWishlistItem{id}currentUserUserAudiobook{id}currentUserHasAuthorFollow{id}} fragment productFields on Product{discountPrice id isFreeListing listingPrice purchaseUrl savingsPercent showListingPrice timeLeft bannerType} query AudiobookSearch($query:String!,$promotionFilter:String,$filter:String,$page:Int,$pageSize:Int){audiobooks(query:$query,promotionFilter:$promotionFilter,filter:$filter,page:$page,pageSize:$pageSize){totalCount objects(page:$page,pageSize:$pageSize){... on Audiobook{...audiobookWithShoppingCartAndUserAudiobookFields futureSaleDate currentProduct{...productFields}}}}}",
+                        "variables": {"query": title, "filter": "all", "page": 1, "promotionFilter": "default"},
+                        "operationName": "AudiobookSearch"
+                    }
+                )
+                response_body = await response.json()
 
-        async with aiohttp.ClientSession() as http_client:
-            response = await http_client.request(
-                "POST",
-                self._url,
-                json={
-                    "query": "fragment audiobookFields on Audiobook{id averageRating coverUrl displayAuthors displayTitle ratingsCount url allAuthors{name slug url}} fragment audiobookWithShoppingCartAndUserAudiobookFields on Audiobook{...audiobookFields currentUserShoppingCartItem{id}currentUserWishlistItem{id}currentUserUserAudiobook{id}currentUserHasAuthorFollow{id}} fragment productFields on Product{discountPrice id isFreeListing listingPrice purchaseUrl savingsPercent showListingPrice timeLeft bannerType} query AudiobookSearch($query:String!,$promotionFilter:String,$filter:String,$page:Int,$pageSize:Int){audiobooks(query:$query,promotionFilter:$promotionFilter,filter:$filter,page:$page,pageSize:$pageSize){totalCount objects(page:$page,pageSize:$pageSize){... on Audiobook{...audiobookWithShoppingCartAndUserAudiobookFields futureSaleDate currentProduct{...productFields}}}}}",
-                    "variables": {"query": title, "filter": "all", "page": 1, "promotionFilter": "default"},
-                    "operationName": "AudiobookSearch"
-                }
-            )
-            response_body = await response.json()
             audiobooks = response_body["data"]["audiobooks"]["objects"]
             if not audiobooks:
                 return Book(
