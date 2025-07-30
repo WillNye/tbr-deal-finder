@@ -2,7 +2,8 @@ import abc
 import asyncio
 from datetime import datetime
 
-from tbr_deal_finder.book import Book
+from tbr_deal_finder.book import Book, BookFormat
+from tbr_deal_finder.config import Config
 
 
 class Retailer(abc.ABC):
@@ -10,6 +11,13 @@ class Retailer(abc.ABC):
 
     @property
     def name(self) -> str:
+        raise NotImplementedError
+
+    @property
+    def format(self) -> BookFormat:
+        raise NotImplementedError
+
+    async def set_auth(self):
         raise NotImplementedError
 
     async def get_book(
@@ -31,7 +39,7 @@ class Retailer(abc.ABC):
             """
         raise NotImplementedError
 
-    async def set_auth(self):
+    async def get_wishlist(self, config: Config) -> list[Book]:
         raise NotImplementedError
 
 

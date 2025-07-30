@@ -75,6 +75,23 @@ class Audible(Retailer):
     def name(self) -> str:
         return "Audible"
 
+    @property
+    def format(self) -> BookFormat:
+        return BookFormat.AUDIOBOOK
+
+    async def set_auth(self):
+        if not os.path.exists(_AUTH_PATH):
+            auth = audible.Authenticator.from_login_external(
+                locale=Config.locale,
+                login_url_callback=login_url_callback
+            )
+
+            # Save credentials to file
+            auth.to_file(_AUTH_PATH)
+
+        self._auth = audible.Authenticator.from_file(_AUTH_PATH)
+        self._client = audible.AsyncClient(auth=self._auth)
+
     async def get_book(
         self,
         target: Book,
@@ -132,15 +149,5 @@ class Audible(Retailer):
                 exists=False,
             )
 
-    async def set_auth(self):
-        if not os.path.exists(_AUTH_PATH):
-            auth = audible.Authenticator.from_login_external(
-                locale=Config.locale,
-                login_url_callback=login_url_callback
-            )
-
-            # Save credentials to file
-            auth.to_file(_AUTH_PATH)
-
-        self._auth = audible.Authenticator.from_file(_AUTH_PATH)
-        self._client = audible.AsyncClient(auth=self._auth)
+    async def get_wishlist(self, config: Config) -> list[Book]:
+        ...

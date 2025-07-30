@@ -3,6 +3,7 @@ from datetime import datetime
 
 import aiohttp
 
+from tbr_deal_finder.config import Config
 from tbr_deal_finder.retailer.models import Retailer
 from tbr_deal_finder.book import Book, BookFormat, get_normalized_authors
 from tbr_deal_finder.utils import currency_to_float
@@ -15,6 +16,13 @@ class Chirp(Retailer):
     @property
     def name(self) -> str:
         return "Chirp"
+
+    @property
+    def format(self) -> BookFormat:
+        return BookFormat.AUDIOBOOK
+
+    async def set_auth(self):
+        return
 
     async def get_book(
         self, target: Book, runtime: datetime, semaphore: asyncio.Semaphore
@@ -75,5 +83,48 @@ class Chirp(Retailer):
                 exists=False,
             )
 
-    async def set_auth(self):
-        return
+    async def get_wishlist(self, config: Config) -> list[Book]:
+        # TODO: This won't work without logging in user
+        # TODO: Add a config to track whether user wants to login to retailers that do not require login
+        #   Be sure they're aware they'll lose wishlist tracking and owned book tracking
+
+        wishlist_books = []
+        page = 1
+
+        async with aiohttp.ClientSession() as http_client:
+            while True:
+                http_response = await http_client.request(
+                    "POST",
+                    self._url,
+                    json={
+                        "query": "fragment audiobookFields on Audiobook{id averageRating coverUrl displayAuthors displayTitle ratingsCount url allAuthors{name slug url}} fragment productFields on Product{discountPrice id isFreeListing listingPrice purchaseUrl savingsPercent showListingPrice timeLeft bannerType} query FetchWishlistDealAudiobooks($page:Int,$pageSize:Int){currentUserWishlist{paginatedItems(filter:\"currently_promoted\",sort:\"promotion_end_date\",salability:current_or_future){totalCount objects(page:$page,pageSize:$pageSize){... on WishlistItem{id audiobook{...audiobookFields currentProduct{...productFields}}}}}}}",
+                        "variables": {"page": page, "pageSize": 15},
+                        "operationName": "FetchCurrentUserRelatedAudiobooks"
+                    }
+                )
+                response_body = await http_response.json()
+                audiobooks = response_body.get(
+                    "data", {}
+                ).get("currentUserWishlist", {}).get("paginatedItems", {}).get("objects", [])
+
+                if not audiobooks:
+                    print("wut?")
+                    print(response_body)
+                    return wishlist_books
+
+                for book in audiobooks:
+                    audiobook = book["audiobook"]
+                    authors = [author["name"] for author in audiobook["displayAuthors"]]
+                    wishlist_books.append(
+                        Book(
+                            retailer=self.name,
+                            title=audiobook["displayTitle"],
+                            authors=", ".join(authors),
+                            list_price=1,
+                            current_price=1,
+                            timepoint=config.run_time,
+                            format=self.format,
+                        )
+                    )
+
+                page += 1

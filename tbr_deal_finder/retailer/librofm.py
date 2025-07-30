@@ -9,6 +9,7 @@ import aiohttp
 import click
 
 from tbr_deal_finder import TBR_DEALS_PATH
+from tbr_deal_finder.config import Config
 from tbr_deal_finder.retailer.models import Retailer
 from tbr_deal_finder.book import Book, BookFormat, get_normalized_authors
 from tbr_deal_finder.utils import currency_to_float
@@ -32,6 +33,10 @@ class LibroFM(Retailer):
     @property
     def name(self) -> str:
         return "Libro.FM"
+
+    @property
+    def format(self) -> BookFormat:
+        return BookFormat.AUDIOBOOK
 
     async def make_request(self, url_path: str, request_type: str, **kwargs) -> dict:
         url = urllib.parse.urljoin(self.BASE_URL, url_path)
@@ -97,6 +102,11 @@ class LibroFM(Retailer):
     async def get_book(
         self, target: Book, runtime: datetime, semaphore: asyncio.Semaphore
     ) -> Book:
+        if target.format == BookFormat.AUDIOBOOK and not target.audiobook_isbn:
+            # When "format" is AUDIOBOOK here that means the target was pulled from an audiobook retailer wishlist
+            # In this flow, there is no attempt to resolve the isbn ahead of time, so it's done here instead.
+            await self.get_book_isbn(target, semaphore)
+
         if not target.audiobook_isbn:
             return Book(
                 retailer=self.name,
@@ -134,3 +144,37 @@ class LibroFM(Retailer):
             format=BookFormat.AUDIOBOOK,
             exists=False,
         )
+
+    async def get_wishlist(self, config: Config) -> list[Book]:
+        wishlist_books = []
+
+        page = 1
+        total_pages = 1
+        while page <= total_pages:
+            response = await self.make_request(
+                f"api/v10/explore/wishlist",
+                "GET",
+                params=dict(page=2)
+            )
+            wishlist = response.get("data", {}).get("wishlist", {})
+            if not wishlist:
+                return []
+
+            for book in wishlist.get("audiobooks", []):
+                wishlist_books.append(
+                    Book(
+                        retailer=self.name,
+                        title=book["title"],
+                        authors=", ".join(book["authors"]),
+                        list_price=1,
+                        current_price=1,
+                        timepoint=config.run_time,
+                        format=self.format,
+                        audiobook_isbn=book["isbn"],
+                    )
+                )
+
+            page += 1
+            total_pages = wishlist["total_pages"]
+
+        return wishlist_books
