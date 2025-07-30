@@ -82,15 +82,17 @@ class LibroFM(Retailer):
 
     async def get_book_isbn(self, book: Book, semaphore: asyncio.Semaphore) -> Union[str, None]:
         title = book.title
-        response = await self.make_request(
-            f"api/v10/explore/search",
-            "GET",
-            params={
-                "q": title,
-                "searchby": "titles",
-                "sortby": "relevance#results",
-            },
-        )
+
+        async with semaphore:
+            response = await self.make_request(
+                f"api/v10/explore/search",
+                "GET",
+                params={
+                    "q": title,
+                    "searchby": "titles",
+                    "sortby": "relevance#results",
+                },
+            )
 
         for b in response["audiobook_collection"]["audiobooks"]:
             if title == b["title"] and book.normalized_authors == get_normalized_authors(b["authors"]):
@@ -118,10 +120,12 @@ class LibroFM(Retailer):
                 format=BookFormat.AUDIOBOOK,
                 exists=False,
             )
-        response = await self.make_request(
-            f"api/v10/explore/audiobook_details/{target.audiobook_isbn}",
-            "GET"
-        )
+
+        async with semaphore:
+            response = await self.make_request(
+                f"api/v10/explore/audiobook_details/{target.audiobook_isbn}",
+                "GET"
+            )
 
         if response:
             return Book(

@@ -1,5 +1,6 @@
 import asyncio
 import os
+import sys
 from datetime import timedelta
 from textwrap import dedent
 from typing import Union
@@ -13,7 +14,14 @@ from tbr_deal_finder.migrations import make_migrations
 from tbr_deal_finder.book import get_deals_found_at, print_books, get_active_deals
 from tbr_deal_finder.retailer import RETAILER_MAP
 from tbr_deal_finder.retailer_deal import get_latest_deals
-from tbr_deal_finder.utils import get_duckdb_conn, get_query_by_name, execute_query
+from tbr_deal_finder.utils import (
+    echo_err,
+    echo_info,
+    echo_success,
+    execute_query,
+    get_duckdb_conn,
+    get_query_by_name
+)
 
 
 @click.group()
@@ -31,12 +39,12 @@ def _add_path(existing_paths: list[str]) -> Union[str, None]:
     try:
         new_path = os.path.expanduser(click.prompt("What is the new path"))
         if new_path in existing_paths:
-            click.echo(f"{new_path} is already being tracked.\n")
+            echo_info(f"{new_path} is already being tracked.\n")
             return None
         elif os.path.exists(new_path):
             return new_path
         else:
-            click.echo(f"Could not find {new_path}. Please try again.\n")
+            echo_err(f"Could not find {new_path}. Please try again.\n")
             return _add_path(existing_paths)
     except (KeyError, KeyboardInterrupt, TypeError):
         return None
@@ -116,14 +124,21 @@ def _set_locale(config: Config):
 
 
 def _set_tracked_retailers(config: Config):
-    config.set_tracked_retailers(
-        questionary.checkbox(
-            "Select the retailers you want to check deals for. "
-            "Tip: Chirp doesn't have a subscription and can have good deals. I'd recommend checking it.",
+    while True:
+        user_response = questionary.checkbox(
+            "Select the retailers you want to check deals for.\n"
+            "Tip: Chirp doesn't have a subscription and can have good deals. I'd recommend checking it.\n",
             choices=[
                 questionary.Choice(retailer, checked=retailer in config.tracked_retailers)
                 for retailer in RETAILER_MAP.keys()
-            ]).ask()
+        ]).ask()
+        if len(user_response) > 1:
+            break
+        else:
+            echo_err("You must track deals for at least one retailer.")
+
+    config.set_tracked_retailers(
+        user_response
     )
 
 
@@ -133,10 +148,14 @@ def _set_config() -> Config:
     except FileNotFoundError:
         config = Config(library_export_paths=[], tracked_retailers=list(RETAILER_MAP.keys()))
 
-    # Setting these config values are a little more involved,
-    #   so they're broken out into their own functions
-    _set_library_export_paths(config)
-    _set_tracked_retailers(config)
+    try:
+        # Config attrs that requires a user provided value
+        _set_library_export_paths(config)
+        _set_tracked_retailers(config)
+    except (KeyError, KeyboardInterrupt, TypeError):
+        echo_err("Config setup cancelled.")
+        sys.exit(0)
+
     _set_locale(config)
 
     config.max_price = click.prompt(
@@ -151,7 +170,7 @@ def _set_config() -> Config:
     )
 
     config.save()
-    click.echo("Configuration saved!")
+    echo_success("Configuration saved!")
 
     return config
 
@@ -182,7 +201,7 @@ def latest_deals():
         except Exception as e:
             ran_successfully = False
             details = f"Error getting deals: {e}"
-            click.echo(details)
+            echo_err(details)
         else:
             ran_successfully = True
             details = ""
@@ -198,7 +217,7 @@ def latest_deals():
             return
 
     else:
-        click.echo(dedent("""
+        echo_info(dedent("""
         To prevent abuse lastest deals can only be pulled every 8 hours.
         Fetching most recent deal results.\n
         """))
@@ -207,7 +226,7 @@ def latest_deals():
     if books := get_deals_found_at(config.run_time):
         print_books(books)
     else:
-        click.echo("No new deals found.")
+        echo_info("No new deals found.")
 
 
 @cli.command()
@@ -216,7 +235,7 @@ def active_deals():
     if books := get_active_deals():
         print_books(books)
     else:
-        click.echo("No deals found.")
+        echo_info("No deals found.")
 
 
 if __name__ == '__main__':

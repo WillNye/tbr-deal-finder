@@ -11,7 +11,7 @@ from tbr_deal_finder.config import Config
 from tbr_deal_finder.library_exports import get_tbr_books
 from tbr_deal_finder.retailer import RETAILER_MAP
 from tbr_deal_finder.retailer.models import Retailer
-from tbr_deal_finder.utils import get_duckdb_conn
+from tbr_deal_finder.utils import get_duckdb_conn, echo_warning, echo_info
 
 
 def update_retailer_deal_table(config: Config, new_deals: list[Book]):
@@ -41,7 +41,7 @@ def update_retailer_deal_table(config: Config, new_deals: list[Book]):
     # Any remaining values in active_deal_map mean that
     # it wasn't found and should be marked for deletion
     for deal in active_deal_map.values():
-        click.echo(f"{str(deal)} is no longer active")
+        echo_warning(f"{str(deal)} is no longer active")
         deal.timepoint = config.run_time
         deal.deleted = True
         df_data.append(deal.dict())
@@ -101,12 +101,12 @@ async def _get_books(config, retailer: Retailer, books: list[Book]) -> list[Book
             unresolved_books.append(book)
 
     if retry_books := _retry_books(response, books):
-        click.echo("Attempting to find missing books with alternate title")
+        echo_info("Attempting to find missing books with alternate title")
         response.extend(await _get_books(config, retailer, retry_books))
     elif unresolved_books:
         click.echo()
         for book in unresolved_books:
-            click.echo(f"{book.title} by {book.authors} not found")
+            echo_info(f"{book.title} by {book.authors} not found")
 
     return response
 
@@ -168,7 +168,7 @@ async def get_latest_deals(config: Config):
         retailer = RETAILER_MAP[retailer_str]()
         await retailer.set_auth()
 
-        click.echo(f"Getting deals from {retailer.name}")
+        echo_info(f"Getting deals from {retailer.name}")
         click.echo("\n---------------")
         books.extend(await _get_books(config, retailer, tbr_books))
         click.echo("---------------\n")

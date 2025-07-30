@@ -1,6 +1,7 @@
 import re
 from typing import Optional
 
+import click
 import duckdb
 
 from tbr_deal_finder import TBR_DEALS_PATH, QUERY_PATH
@@ -38,3 +39,19 @@ def execute_query(
 
 def get_query_by_name(file_name: str) -> str:
     return QUERY_PATH.joinpath(file_name).read_text()
+
+
+def echo_err(message):
+    click.secho(f'\n❌  {message}\n', fg='red', bold=True)
+
+
+def echo_success(message):
+    click.secho(f'\n✅  {message}', fg='green', bold=True)
+
+
+def echo_warning(message):
+    click.secho(f'\n⚠️  {message}', fg='yellow')
+
+
+def echo_info(message):
+    click.secho(f'{message}', fg='blue')
