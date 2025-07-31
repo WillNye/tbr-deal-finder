@@ -15,6 +15,14 @@ class Retailer(abc.ABC):
 
     @property
     def format(self) -> BookFormat:
+        """The format of the books they sell.
+
+        For example,
+        Audible would be audiobooks
+        Kindle would be ebooks
+
+        :return:
+        """
         raise NotImplementedError
 
     async def set_auth(self):

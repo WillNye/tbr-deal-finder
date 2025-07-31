@@ -26,7 +26,11 @@ class Book:
     current_price: float
     timepoint: datetime
     format: Union[BookFormat, str]
+
+    # Metadata really only used for tracked books.
+    # See get_tbr_books for more context
     audiobook_isbn: str = None
+    audiobook_list_price: float = 0
 
     deleted: bool = False
 
@@ -35,15 +39,15 @@ class Book:
     normalized_authors: list[str] = None
 
     def __post_init__(self):
-        if not self.deal_id:
-            self.deal_id = f"{self.title}__{self.normalized_authors}__{self.retailer}__{self.format}"
-
-        if isinstance(self.format, str):
-            self.format = BookFormat(self.format)
-
         self.current_price = round(self.current_price, 2)
         self.list_price = round(self.list_price, 2)
         self.normalized_authors = get_normalized_authors(self.authors)
+
+        if not self.deal_id:
+            self.deal_id = f"{self.title}__{self.normalized_authors}__{self.format}__{self.retailer}"
+
+        if isinstance(self.format, str):
+            self.format = BookFormat(self.format)
 
     def discount(self) -> int:
         return int((self.list_price/self.current_price - 1) * 100)
@@ -55,6 +59,10 @@ class Book:
     @property
     def title_id(self) -> str:
         return f"{self.title}__{self.normalized_authors}__{self.format}"
+
+    @property
+    def full_title_str(self) -> str:
+        return f"{self.title}__{self.normalized_authors}"
 
     def list_price_string(self):
         return self.price_to_string(self.list_price)
@@ -74,6 +82,7 @@ class Book:
         response = dataclasses.asdict(self)
         response["format"] = self.format.value
         del response["audiobook_isbn"]
+        del response["audiobook_list_price"]
         del response["exists"]
         del response["normalized_authors"]
 
@@ -114,3 +123,7 @@ def get_normalized_authors(authors: Union[str, list[str]]) -> list[str]:
         authors = [i for i in authors.split(",")]
 
     return sorted([_AUTHOR_RE.sub('', unidecode(author)).lower() for author in authors])
+
+
+def get_title_id(title: str, authors: Union[list, str], book_format: BookFormat) -> str:
+    return f"{title}__{get_normalized_authors(authors)}__{book_format.value}"
