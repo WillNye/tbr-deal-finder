@@ -9,7 +9,7 @@ import click
 import questionary
 
 from tbr_deal_finder.config import Config
-from tbr_deal_finder.library_exports import maybe_set_library_export_audiobook_isbn
+from tbr_deal_finder.library_exports import maybe_enrich_library_exports
 from tbr_deal_finder.migrations import make_migrations
 from tbr_deal_finder.book import get_deals_found_at, print_books, get_active_deals
 from tbr_deal_finder.retailer import RETAILER_MAP
@@ -124,15 +124,20 @@ def _set_locale(config: Config):
 
 
 def _set_tracked_retailers(config: Config):
+    if not config.tracked_retailers:
+        echo_info(
+            "If you haven't heard of it, Chirp doesn't charge a subscription and has some great deals. \n"
+            "Note: I don't work for Chirp and this isn't a paid plug."
+        )
+
     while True:
         user_response = questionary.checkbox(
-            "Select the retailers you want to check deals for.\n"
-            "Tip: Chirp doesn't have a subscription and can have good deals. I'd recommend checking it.\n",
+            "Select the retailers you want to check deals for.\n",
             choices=[
                 questionary.Choice(retailer, checked=retailer in config.tracked_retailers)
                 for retailer in RETAILER_MAP.keys()
         ]).ask()
-        if len(user_response) > 1:
+        if len(user_response) > 0:
             break
         else:
             echo_err("You must track deals for at least one retailer.")
@@ -185,7 +190,7 @@ def latest_deals():
     """Find book deals from your Library export."""
     config = Config.load()
 
-    asyncio.run(maybe_set_library_export_audiobook_isbn(config))
+    asyncio.run(maybe_enrich_library_exports(config))
 
     db_conn = get_duckdb_conn()
     results = execute_query(

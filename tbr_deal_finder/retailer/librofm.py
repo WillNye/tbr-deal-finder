@@ -3,12 +3,12 @@ import json
 import os
 import urllib.parse
 from datetime import datetime, timedelta
-from typing import Union
 
 import aiohttp
 import click
 
 from tbr_deal_finder import TBR_DEALS_PATH
+from tbr_deal_finder.config import Config
 from tbr_deal_finder.retailer.models import Retailer
 from tbr_deal_finder.book import Book, BookFormat, get_normalized_authors
 from tbr_deal_finder.utils import currency_to_float
@@ -33,11 +33,16 @@ class LibroFM(Retailer):
     def name(self) -> str:
         return "Libro.FM"
 
+    @property
+    def format(self) -> BookFormat:
+        return BookFormat.AUDIOBOOK
+
     async def make_request(self, url_path: str, request_type: str, **kwargs) -> dict:
         url = urllib.parse.urljoin(self.BASE_URL, url_path)
         headers = kwargs.pop("headers", {})
         headers["User-Agent"] = self.USER_AGENT
-        headers["authorization"] = f"Bearer {self.auth_token}"
+        if self.auth_token:
+            headers["authorization"] = f"Bearer {self.auth_token}"
 
         async with aiohttp.ClientSession() as http_client:
             response = await http_client.request(
@@ -75,7 +80,9 @@ class LibroFM(Retailer):
         with open(auth_path, "w") as f:
             json.dump(response, f)
 
-    async def get_book_isbn(self, book: Book, semaphore: asyncio.Semaphore) -> Union[str, None]:
+    async def get_book_isbn(self, book: Book, runtime: datetime, semaphore: asyncio.Semaphore) -> Book:
+        # runtime isn't used but get_book_isbn must follow the get_book method signature.
+
         title = book.title
 
         async with semaphore:
@@ -90,15 +97,25 @@ class LibroFM(Retailer):
             )
 
         for b in response["audiobook_collection"]["audiobooks"]:
-            if title == b["title"] and book.normalized_authors == get_normalized_authors(b["authors"]):
-                book.audiobook_isbn = b["isbn"]
-                return book.audiobook_isbn
+            normalized_authors = get_normalized_authors(b["authors"])
 
-        return None
+            if (
+                title == b["title"]
+                and any(author in normalized_authors for author in book.normalized_authors)
+            ):
+                book.audiobook_isbn = b["isbn"]
+                break
+
+        return book
 
     async def get_book(
         self, target: Book, runtime: datetime, semaphore: asyncio.Semaphore
     ) -> Book:
+        if target.format == BookFormat.AUDIOBOOK and not target.audiobook_isbn:
+            # When "format" is AUDIOBOOK here that means the target was pulled from an audiobook retailer wishlist
+            # In this flow, there is no attempt to resolve the isbn ahead of time, so it's done here instead.
+            await self.get_book_isbn(target, runtime, semaphore)
+
         if not target.audiobook_isbn:
             return Book(
                 retailer=self.name,
@@ -122,7 +139,7 @@ class LibroFM(Retailer):
                 retailer=self.name,
                 title=target.title,
                 authors=target.authors,
-                list_price=0,
+                list_price=target.audiobook_list_price,
                 current_price=currency_to_float(response["data"]["purchase_info"]["price"]),
                 timepoint=runtime,
                 format=BookFormat.AUDIOBOOK,
@@ -138,3 +155,37 @@ class LibroFM(Retailer):
             format=BookFormat.AUDIOBOOK,
             exists=False,
         )
+
+    async def get_wishlist(self, config: Config) -> list[Book]:
+        wishlist_books = []
+
+        page = 1
+        total_pages = 1
+        while page <= total_pages:
+            response = await self.make_request(
+                f"api/v10/explore/wishlist",
+                "GET",
+                params=dict(page=2)
+            )
+            wishlist = response.get("data", {}).get("wishlist", {})
+            if not wishlist:
+                return []
+
+            for book in wishlist.get("audiobooks", []):
+                wishlist_books.append(
+                    Book(
+                        retailer=self.name,
+                        title=book["title"],
+                        authors=", ".join(book["authors"]),
+                        list_price=1,
+                        current_price=1,
+                        timepoint=config.run_time,
+                        format=self.format,
+                        audiobook_isbn=book["isbn"],
+                    )
+                )
+
+            page += 1
+            total_pages = wishlist["total_pages"]
+
+        return wishlist_books

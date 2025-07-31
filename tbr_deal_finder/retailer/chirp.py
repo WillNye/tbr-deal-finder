@@ -1,20 +1,86 @@
 import asyncio
-from datetime import datetime
+import json
+import os
+from datetime import datetime, timedelta
 
 import aiohttp
+import click
 
+from tbr_deal_finder import TBR_DEALS_PATH
+from tbr_deal_finder.config import Config
 from tbr_deal_finder.retailer.models import Retailer
 from tbr_deal_finder.book import Book, BookFormat, get_normalized_authors
-from tbr_deal_finder.utils import currency_to_float
+from tbr_deal_finder.utils import currency_to_float, echo_err
 
 
 class Chirp(Retailer):
     # Static because url for other locales just redirects to .com
-    _url: str = "https://www.chirpbooks.com/api/graphql"
+    _url: str = "https://api.chirpbooks.com/api/graphql"
+    USER_AGENT = "ChirpBooks/5.13.9 (Android)"
+
+    def __init__(self):
+        self.auth_token = None
 
     @property
     def name(self) -> str:
         return "Chirp"
+
+    @property
+    def format(self) -> BookFormat:
+        return BookFormat.AUDIOBOOK
+
+    async def make_request(self, request_type: str, **kwargs) -> dict:
+        headers = kwargs.pop("headers", {})
+        headers["Accept"] = "application/json"
+        headers["Content-Type"] = "application/json"
+        headers["User-Agent"] = self.USER_AGENT
+        if self.auth_token:
+            headers["authorization"] = f"Bearer {self.auth_token}"
+
+        async with aiohttp.ClientSession() as http_client:
+            response = await http_client.request(
+                request_type.upper(),
+                self._url,
+                headers=headers,
+                **kwargs
+            )
+            if response.ok:
+                return await response.json()
+            else:
+                return {}
+
+    async def set_auth(self):
+        auth_path = TBR_DEALS_PATH.joinpath("chirp.json")
+        if os.path.exists(auth_path):
+            with open(auth_path, "r") as f:
+                auth_info = json.load(f)
+                if auth_info:
+                    token_created_at = datetime.fromtimestamp(auth_info["created_at"])
+                    max_token_age = datetime.now() - timedelta(days=5)
+                    if token_created_at > max_token_age:
+                        self.auth_token = auth_info["data"]["signIn"]["user"]["token"]
+                        return
+
+        response = await self.make_request(
+            "POST",
+            json={
+                "query": "mutation signIn($email: String!, $password: String!) { signIn(email: $email, password: $password) { user { id token webToken email } } }",
+                "variables": {
+                    "email": click.prompt("Chirp account email"),
+                    "password": click.prompt("Chirp Password", hide_input=True),
+                }
+            }
+        )
+        if not response:
+            echo_err("Chirp login failed, please try again.")
+            await self.set_auth()
+
+        # Set token for future requests during the current execution
+        self.auth_token = response["data"]["signIn"]["user"]["token"]
+
+        response["created_at"] = datetime.now().timestamp()
+        with open(auth_path, "w") as f:
+            json.dump(response, f)
 
     async def get_book(
         self, target: Book, runtime: datetime, semaphore: asyncio.Semaphore
@@ -51,9 +117,10 @@ class Chirp(Retailer):
                 if not book["currentProduct"]:
                     continue
 
+                normalized_authors = get_normalized_authors([author["name"] for author in book["allAuthors"]])
                 if (
                     book["displayTitle"] == title
-                    and get_normalized_authors(book["displayAuthors"]) == target.normalized_authors
+                    and any(author in normalized_authors for author in target.normalized_authors)
                 ):
                     return Book(
                         retailer=self.name,
@@ -76,5 +143,40 @@ class Chirp(Retailer):
                 exists=False,
             )
 
-    async def set_auth(self):
-        return
+    async def get_wishlist(self, config: Config) -> list[Book]:
+        wishlist_books = []
+        page = 1
+
+        while True:
+            response = await self.make_request(
+                "POST",
+                json={
+                    "query": "fragment audiobookFields on Audiobook{id averageRating coverUrl displayAuthors displayTitle ratingsCount url allAuthors{name slug url}} fragment productFields on Product{discountPrice id isFreeListing listingPrice purchaseUrl savingsPercent showListingPrice timeLeft bannerType} query FetchWishlistDealAudiobooks($page:Int,$pageSize:Int){currentUserWishlist{paginatedItems(filter:\"currently_promoted\",sort:\"promotion_end_date\",salability:current_or_future){totalCount objects(page:$page,pageSize:$pageSize){... on WishlistItem{id audiobook{...audiobookFields currentProduct{...productFields}}}}}}}",
+                    "variables": {"page": page, "pageSize": 15},
+                    "operationName": "FetchWishlistDealAudiobooks"
+                }
+            )
+
+            audiobooks = response.get(
+                "data", {}
+            ).get("currentUserWishlist", {}).get("paginatedItems", {}).get("objects", [])
+
+            if not audiobooks:
+                return wishlist_books
+
+            for book in audiobooks:
+                audiobook = book["audiobook"]
+                authors = [author["name"] for author in audiobook["allAuthors"]]
+                wishlist_books.append(
+                    Book(
+                        retailer=self.name,
+                        title=audiobook["displayTitle"],
+                        authors=", ".join(authors),
+                        list_price=1,
+                        current_price=1,
+                        timepoint=config.run_time,
+                        format=self.format,
+                    )
+                )
+
+            page += 1

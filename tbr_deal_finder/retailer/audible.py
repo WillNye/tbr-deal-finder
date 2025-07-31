@@ -1,4 +1,5 @@
 import asyncio
+import math
 import os.path
 from datetime import datetime
 from textwrap import dedent
@@ -22,11 +23,9 @@ def login_url_callback(url: str) -> str:
 
     try:
         from playwright.sync_api import sync_playwright  # type: ignore
-        use_playwright = True
     except ImportError:
-        use_playwright = False
-
-    if use_playwright:
+        pass
+    else:
         with sync_playwright() as p:
             iphone = p.devices["iPhone 12 Pro"]
             browser = p.webkit.launch(headless=False)
@@ -75,6 +74,23 @@ class Audible(Retailer):
     def name(self) -> str:
         return "Audible"
 
+    @property
+    def format(self) -> BookFormat:
+        return BookFormat.AUDIOBOOK
+
+    async def set_auth(self):
+        if not os.path.exists(_AUTH_PATH):
+            auth = audible.Authenticator.from_login_external(
+                locale=Config.locale,
+                login_url_callback=login_url_callback
+            )
+
+            # Save credentials to file
+            auth.to_file(_AUTH_PATH)
+
+        self._auth = audible.Authenticator.from_file(_AUTH_PATH)
+        self._client = audible.AsyncClient(auth=self._auth)
+
     async def get_book(
         self,
         target: Book,
@@ -95,19 +111,7 @@ class Audible(Retailer):
                 ]
             )
 
-            if not match["products"]:
-                return Book(
-                    retailer=self.name,
-                    title=title,
-                    authors=authors,
-                    list_price=0,
-                    current_price=0,
-                    timepoint=runtime,
-                    format=BookFormat.AUDIOBOOK,
-                    exists=False,
-                )
-
-            for product in match["products"]:
+            for product in match.get("products", []):
                 if product["title"] != title:
                     continue
 
@@ -132,15 +136,38 @@ class Audible(Retailer):
                 exists=False,
             )
 
-    async def set_auth(self):
-        if not os.path.exists(_AUTH_PATH):
-            auth = audible.Authenticator.from_login_external(
-                locale=Config.locale,
-                login_url_callback=login_url_callback
+    async def get_wishlist(self, config: Config) -> list[Book]:
+        wishlist_books = []
+
+        page = 0
+        total_pages = 1
+        page_size = 50
+        while page < total_pages:
+            response = await self._client.get(
+                "1.0/wishlist",
+                num_results=page_size,
+                page=page,
+                response_groups=[
+                    "contributors, product_attrs, product_desc, product_extended_attrs"
+                ]
             )
 
-            # Save credentials to file
-            auth.to_file(_AUTH_PATH)
+            for audiobook in response.get("products", []):
+                authors = [author["name"] for author in audiobook["authors"]]
+                wishlist_books.append(
+                    Book(
+                        retailer=self.name,
+                        title=audiobook["title"],
+                        authors=", ".join(authors),
+                        list_price=1,
+                        current_price=1,
+                        timepoint=config.run_time,
+                        format=self.format,
+                        audiobook_isbn=audiobook["isbn"],
+                    )
+                )
 
-        self._auth = audible.Authenticator.from_file(_AUTH_PATH)
-        self._client = audible.AsyncClient(auth=self._auth)
+            page += 1
+            total_pages = math.ceil(int(response.get("total_results", 1))/page_size)
+
+        return wishlist_books
