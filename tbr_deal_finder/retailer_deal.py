@@ -6,9 +6,9 @@ import click
 import pandas as pd
 from tqdm.asyncio import tqdm_asyncio
 
-from tbr_deal_finder.book import Book, get_active_deals
+from tbr_deal_finder.book import Book, get_active_deals, BookFormat
 from tbr_deal_finder.config import Config
-from tbr_deal_finder.library_exports import get_tbr_books
+from tbr_deal_finder.tracked_books import get_tbr_books
 from tbr_deal_finder.retailer import RETAILER_MAP
 from tbr_deal_finder.retailer.models import Retailer
 from tbr_deal_finder.utils import get_duckdb_conn, echo_warning, echo_info
@@ -73,7 +73,7 @@ def _retry_books(found_books: list[Book], all_books: list[Book]) -> list[Book]:
 async def _get_books(config, retailer: Retailer, books: list[Book]) -> list[Book]:
     """Get Books with limited concurrency.
 
-    - Creates a semaphore to limit concurrent requests.
+    - Creates semaphore to limit concurrent requests.
     - Creates a list to store the response.
     - Creates a list to store unresolved books.
 
@@ -163,14 +163,23 @@ async def get_latest_deals(config: Config):
     """
 
     books: list[Book] = []
-    tbr_books = get_tbr_books(config)
+    tbr_books = await get_tbr_books(config)
+
     for retailer_str in config.tracked_retailers:
         retailer = RETAILER_MAP[retailer_str]()
         await retailer.set_auth()
 
+        # Don't check on deals in a specified format
+        #   that does not match the format the retailer sells
+        relevant_tbr_books = [
+            book
+            for book in tbr_books
+            if book.format == BookFormat.NA or book.format == retailer.format
+        ]
+
         echo_info(f"Getting deals from {retailer.name}")
         click.echo("\n---------------")
-        books.extend(await _get_books(config, retailer, tbr_books))
+        books.extend(await _get_books(config, retailer, relevant_tbr_books))
         click.echo("---------------\n")
 
     _apply_proper_list_prices(books)
