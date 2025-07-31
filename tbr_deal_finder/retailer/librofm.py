@@ -3,7 +3,6 @@ import json
 import os
 import urllib.parse
 from datetime import datetime, timedelta
-from typing import Union
 
 import aiohttp
 import click
@@ -42,7 +41,8 @@ class LibroFM(Retailer):
         url = urllib.parse.urljoin(self.BASE_URL, url_path)
         headers = kwargs.pop("headers", {})
         headers["User-Agent"] = self.USER_AGENT
-        headers["authorization"] = f"Bearer {self.auth_token}"
+        if self.auth_token:
+            headers["authorization"] = f"Bearer {self.auth_token}"
 
         async with aiohttp.ClientSession() as http_client:
             response = await http_client.request(
@@ -80,7 +80,9 @@ class LibroFM(Retailer):
         with open(auth_path, "w") as f:
             json.dump(response, f)
 
-    async def get_book_isbn(self, book: Book, semaphore: asyncio.Semaphore) -> Union[str, None]:
+    async def get_book_isbn(self, book: Book, runtime: datetime, semaphore: asyncio.Semaphore) -> Book:
+        # runtime isn't used but get_book_isbn must follow the get_book method signature.
+
         title = book.title
 
         async with semaphore:
@@ -95,11 +97,16 @@ class LibroFM(Retailer):
             )
 
         for b in response["audiobook_collection"]["audiobooks"]:
-            if title == b["title"] and book.normalized_authors == get_normalized_authors(b["authors"]):
-                book.audiobook_isbn = b["isbn"]
-                return book.audiobook_isbn
+            normalized_authors = get_normalized_authors(b["authors"])
 
-        return None
+            if (
+                title == b["title"]
+                and any(author in normalized_authors for author in book.normalized_authors)
+            ):
+                book.audiobook_isbn = b["isbn"]
+                break
+
+        return book
 
     async def get_book(
         self, target: Book, runtime: datetime, semaphore: asyncio.Semaphore
@@ -107,7 +114,7 @@ class LibroFM(Retailer):
         if target.format == BookFormat.AUDIOBOOK and not target.audiobook_isbn:
             # When "format" is AUDIOBOOK here that means the target was pulled from an audiobook retailer wishlist
             # In this flow, there is no attempt to resolve the isbn ahead of time, so it's done here instead.
-            await self.get_book_isbn(target, semaphore)
+            await self.get_book_isbn(target, runtime, semaphore)
 
         if not target.audiobook_isbn:
             return Book(
@@ -132,7 +139,7 @@ class LibroFM(Retailer):
                 retailer=self.name,
                 title=target.title,
                 authors=target.authors,
-                list_price=0,
+                list_price=target.audiobook_list_price,
                 current_price=currency_to_float(response["data"]["purchase_info"]["price"]),
                 timepoint=runtime,
                 format=BookFormat.AUDIOBOOK,
