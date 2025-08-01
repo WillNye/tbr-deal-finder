@@ -7,7 +7,7 @@ from typing import Callable, Awaitable, Optional
 
 from tqdm.asyncio import tqdm_asyncio
 
-from tbr_deal_finder.book import Book, BookFormat, get_normalized_authors
+from tbr_deal_finder.book import Book, BookFormat, get_full_title_str
 from tbr_deal_finder.config import Config
 from tbr_deal_finder.retailer import LibroFM, Chirp
 
@@ -61,6 +61,9 @@ async def _maybe_set_column_for_library_exports(
     :param column_name:
     :return:
     """
+    if not config.library_export_paths:
+        return
+
     if not column_name:
         column_name = attr_name
 
@@ -77,7 +80,7 @@ async def _maybe_set_column_for_library_exports(
 
                 title = get_book_title(book_dict)
                 authors = get_book_authors(book_dict)
-                key = f'{title}__{get_normalized_authors(authors)}'
+                key = get_full_title_str(title, authors)
 
                 if column_name in book_dict:
                     # Keep state of value for this book/key
@@ -136,7 +139,7 @@ async def _maybe_set_column_for_library_exports(
                     if is_tbr_book(book_dict):
                         title = get_book_title(book_dict)
                         authors = get_book_authors(book_dict)
-                        key = f'{title}__{get_normalized_authors(authors)}'
+                        key = get_full_title_str(title, authors)
 
                         if key in book_to_col_val_map:
                             col_val = book_to_col_val_map[key]
