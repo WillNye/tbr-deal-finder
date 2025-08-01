@@ -10,7 +10,7 @@ import click
 from tbr_deal_finder import TBR_DEALS_PATH
 from tbr_deal_finder.config import Config
 from tbr_deal_finder.retailer.models import Retailer
-from tbr_deal_finder.book import Book, BookFormat, get_normalized_authors
+from tbr_deal_finder.book import Book, BookFormat, get_normalized_authors, is_matching_authors
 from tbr_deal_finder.utils import currency_to_float
 
 
@@ -101,7 +101,7 @@ class LibroFM(Retailer):
 
             if (
                 title == b["title"]
-                and any(author in normalized_authors for author in book.normalized_authors)
+                and is_matching_authors(book.normalized_authors, normalized_authors)
             ):
                 book.audiobook_isbn = b["isbn"]
                 break
@@ -165,7 +165,7 @@ class LibroFM(Retailer):
             response = await self.make_request(
                 f"api/v10/explore/wishlist",
                 "GET",
-                params=dict(page=2)
+                params=dict(page=page)
             )
             wishlist = response.get("data", {}).get("wishlist", {})
             if not wishlist:
@@ -189,3 +189,34 @@ class LibroFM(Retailer):
             total_pages = wishlist["total_pages"]
 
         return wishlist_books
+
+    async def get_library(self, config: Config) -> list[Book]:
+        library_books = []
+
+        page = 1
+        total_pages = 1
+        while page <= total_pages:
+            response = await self.make_request(
+                f"api/v10/library",
+                "GET",
+                params=dict(page=page)
+            )
+
+            for book in response.get("audiobooks", []):
+                library_books.append(
+                    Book(
+                        retailer=self.name,
+                        title=book["title"],
+                        authors=", ".join(book["authors"]),
+                        list_price=1,
+                        current_price=1,
+                        timepoint=config.run_time,
+                        format=self.format,
+                        audiobook_isbn=book["isbn"],
+                    )
+                )
+
+            page += 1
+            total_pages = response["total_pages"]
+
+        return library_books
