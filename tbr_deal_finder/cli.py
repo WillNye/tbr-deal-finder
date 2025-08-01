@@ -28,12 +28,6 @@ from tbr_deal_finder.utils import (
 def cli():
     make_migrations()
 
-    # Check that the config exists for all commands ran
-    try:
-        Config.load()
-    except FileNotFoundError:
-        _set_config()
-
 
 def _add_path(existing_paths: list[str]) -> Union[str, None]:
     try:
@@ -68,24 +62,26 @@ def _set_library_export_paths(config: Config):
     Ensures that only valid, unique paths are added. Updates the config in-place.
     """
     while True:
-        if config.library_export_paths:
-            if len(config.library_export_paths) > 1:
-                choices = ["Add new path", "Remove path", "Done"]
-            else:
-                choices = ["Add new path", "Done"]
-
-            try:
-                user_selection = questionary.select(
-                    "What change would you like to make to your library export paths",
-                    choices=choices,
-                ).ask()
-            except (KeyError, KeyboardInterrupt, TypeError):
-                return
+        if len(config.library_export_paths) > 0:
+            choices = ["Add new path", "Remove path", "Done"]
         else:
-            click.echo("Add your library export path.")
-            user_selection = "Add new path"
+            choices = ["Add new path", "Done"]
+
+        try:
+            user_selection = questionary.select(
+                "What change would you like to make to your library export paths",
+                choices=choices,
+            ).ask()
+        except (KeyError, KeyboardInterrupt, TypeError):
+            return
 
         if user_selection == "Done":
+            if not config.library_export_paths:
+                if not click.confirm(
+                    "Don't add a GoodReads or StoryGraph export and use wishlist entirely? "
+                    "Note: Wishlist checks will still work even if you add your StoryGraph/GoodReads export."
+                ):
+                    continue
             return
         elif user_selection == "Add new path":
             if new_path := _add_path(config.library_export_paths):
@@ -188,7 +184,10 @@ def setup():
 @cli.command()
 def latest_deals():
     """Find book deals from your Library export."""
-    config = Config.load()
+    try:
+        config = Config.load()
+    except FileNotFoundError:
+        config = _set_config()
 
     asyncio.run(maybe_enrich_library_exports(config))
 
