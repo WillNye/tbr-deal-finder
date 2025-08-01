@@ -171,3 +171,39 @@ class Audible(Retailer):
             total_pages = math.ceil(int(response.get("total_results", 1))/page_size)
 
         return wishlist_books
+
+    async def get_library(self, config: Config) -> list[Book]:
+        library_books = []
+
+        page = 1
+        total_pages = 1
+        page_size = 1000
+        while page <= total_pages:
+            response = await self._client.get(
+                "1.0/library",
+                num_results=page_size,
+                page=page,
+                response_groups=[
+                    "contributors, product_attrs, product_desc, product_extended_attrs"
+                ]
+            )
+
+            for audiobook in response.get("items", []):
+                authors = [author["name"] for author in audiobook["authors"]]
+                library_books.append(
+                    Book(
+                        retailer=self.name,
+                        title=audiobook["title"],
+                        authors=", ".join(authors),
+                        list_price=1,
+                        current_price=1,
+                        timepoint=config.run_time,
+                        format=self.format,
+                        audiobook_isbn=audiobook["isbn"],
+                    )
+                )
+
+            page += 1
+            total_pages = math.ceil(int(response.get("total_results", 1))/page_size)
+
+        return library_books

@@ -62,10 +62,16 @@ class Config:
         tracked_retailers_str = parser.get('DEFAULT', 'tracked_retailers')
         locale = parser.get('DEFAULT', 'locale', fallback="us")
         cls.set_locale(locale)
+
+        if export_paths_str:
+            library_export_paths = [i.strip() for i in export_paths_str.split(",")]
+        else:
+            library_export_paths = []
+
         return cls(
             max_price=parser.getfloat('DEFAULT', 'max_price', fallback=8.0),  
             min_discount=parser.getint('DEFAULT', 'min_discount', fallback=35),
-            library_export_paths=[i.strip() for i in export_paths_str.split(",")],
+            library_export_paths=library_export_paths,
             tracked_retailers=[i.strip() for i in tracked_retailers_str.split(",")]
         )
 
@@ -78,7 +84,9 @@ class Config:
         return ", ".join(self.tracked_retailers)
 
     def set_library_export_paths(self, library_export_paths: Union[str, list[str]]):
-        if isinstance(library_export_paths, str):
+        if not library_export_paths:
+            self.library_export_paths = []
+        elif isinstance(library_export_paths, str):
             self.library_export_paths = [i.strip() for i in library_export_paths.split(",")]
         else:
             self.library_export_paths = library_export_paths

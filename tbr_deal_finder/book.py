@@ -5,6 +5,7 @@ from enum import Enum
 from typing import Optional, Union
 
 import click
+from Levenshtein import ratio
 from unidecode import unidecode
 
 from tbr_deal_finder.config import Config
@@ -42,6 +43,10 @@ class Book:
         self.current_price = round(self.current_price, 2)
         self.list_price = round(self.list_price, 2)
         self.normalized_authors = get_normalized_authors(self.authors)
+
+        # Strip the title down to its most basic repr
+        # Improves hit rate on retailers
+        self.title = self.title.split(":")[0].split("(")[0].strip()
 
         if not self.deal_id:
             self.deal_id = f"{self.title}__{self.normalized_authors}__{self.format}__{self.retailer}"
@@ -118,6 +123,14 @@ def print_books(books: list[Book]):
         click.echo(str(book))
 
 
+def get_full_title_str(title: str, authors: Union[list, str]) -> str:
+    return f"{title}__{get_normalized_authors(authors)}"
+
+
+def get_title_id(title: str, authors: Union[list, str], book_format: BookFormat) -> str:
+    return f"{title}__{get_normalized_authors(authors)}__{book_format.value}"
+
+
 def get_normalized_authors(authors: Union[str, list[str]]) -> list[str]:
     if isinstance(authors, str):
         authors = [i for i in authors.split(",")]
@@ -125,5 +138,18 @@ def get_normalized_authors(authors: Union[str, list[str]]) -> list[str]:
     return sorted([_AUTHOR_RE.sub('', unidecode(author)).lower() for author in authors])
 
 
-def get_title_id(title: str, authors: Union[list, str], book_format: BookFormat) -> str:
-    return f"{title}__{get_normalized_authors(authors)}__{book_format.value}"
+def is_matching_authors(a1: list[str], a2: list[str]) -> bool:
+    """Checks if two normalized authors are matching.
+    Matching here means that they are at least 80% similar using levenshtein distance.
+
+    Score is calculated as follows:
+        1 - (distance / (len1 + len2))
+
+    :param a1:
+    :param a2:
+    :return:
+    """
+    return any(
+        any(ratio(author1, author2, score_cutoff=.8) for author2 in a2)
+        for author1 in a1
+    )

@@ -50,4 +50,6 @@ class Retailer(abc.ABC):
     async def get_wishlist(self, config: Config) -> list[Book]:
         raise NotImplementedError
 
+    async def get_library(self, config: Config) -> list[Book]:
+        raise NotImplementedError
 

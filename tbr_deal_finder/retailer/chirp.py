@@ -2,6 +2,7 @@ import asyncio
 import json
 import os
 from datetime import datetime, timedelta
+from textwrap import dedent
 
 import aiohttp
 import click
@@ -9,7 +10,7 @@ import click
 from tbr_deal_finder import TBR_DEALS_PATH
 from tbr_deal_finder.config import Config
 from tbr_deal_finder.retailer.models import Retailer
-from tbr_deal_finder.book import Book, BookFormat, get_normalized_authors
+from tbr_deal_finder.book import Book, BookFormat, get_normalized_authors, is_matching_authors
 from tbr_deal_finder.utils import currency_to_float, echo_err
 
 
@@ -120,7 +121,7 @@ class Chirp(Retailer):
                 normalized_authors = get_normalized_authors([author["name"] for author in book["allAuthors"]])
                 if (
                     book["displayTitle"] == title
-                    and any(author in normalized_authors for author in target.normalized_authors)
+                    and is_matching_authors(target.normalized_authors, normalized_authors)
                 ):
                     return Book(
                         retailer=self.name,
@@ -168,6 +169,64 @@ class Chirp(Retailer):
                 audiobook = book["audiobook"]
                 authors = [author["name"] for author in audiobook["allAuthors"]]
                 wishlist_books.append(
+                    Book(
+                        retailer=self.name,
+                        title=audiobook["displayTitle"],
+                        authors=", ".join(authors),
+                        list_price=1,
+                        current_price=1,
+                        timepoint=config.run_time,
+                        format=self.format,
+                    )
+                )
+
+            page += 1
+
+    async def get_library(self, config: Config) -> list[Book]:
+        library_books = []
+        page = 1
+        query = dedent("""
+            query AndroidCurrentUserAudiobooks($page: Int!, $pageSize: Int!) {
+                currentUserAudiobooks(page: $page, pageSize: $pageSize, sort: TITLE_A_Z, clientCapabilities: [CHIRP_AUDIO]) {
+                    audiobook {
+                        id
+                        allAuthors{name}
+                        displayTitle
+                        displayAuthors
+                        displayNarrators
+                        durationMs
+                        description
+                        publisher
+                    }
+                    archived
+                    playable
+                    finishedAt
+                    currentOverallOffsetMs
+                }
+            }
+        """)
+
+        while True:
+            response = await self.make_request(
+                "POST",
+                json={
+                    "query": query,
+                    "variables": {"page": page, "pageSize": 15},
+                    "operationName": "AndroidCurrentUserAudiobooks"
+                }
+            )
+
+            audiobooks = response.get(
+                "data", {}
+            ).get("currentUserAudiobooks", [])
+
+            if not audiobooks:
+                return library_books
+
+            for book in audiobooks:
+                audiobook = book["audiobook"]
+                authors = [author["name"] for author in audiobook["allAuthors"]]
+                library_books.append(
                     Book(
                         retailer=self.name,
                         title=audiobook["displayTitle"],

@@ -8,6 +8,7 @@ from tqdm.asyncio import tqdm_asyncio
 
 from tbr_deal_finder.book import Book, get_active_deals, BookFormat
 from tbr_deal_finder.config import Config
+from tbr_deal_finder.owned_books import get_owned_books
 from tbr_deal_finder.tracked_books import get_tbr_books
 from tbr_deal_finder.retailer import RETAILER_MAP
 from tbr_deal_finder.retailer.models import Retailer
@@ -41,7 +42,7 @@ def update_retailer_deal_table(config: Config, new_deals: list[Book]):
     # Any remaining values in active_deal_map mean that
     # it wasn't found and should be marked for deletion
     for deal in active_deal_map.values():
-        echo_warning(f"{str(deal)} is no longer active")
+        echo_warning(f"{str(deal)} is no longer active\n")
         deal.timepoint = config.run_time
         deal.deleted = True
         df_data.append(deal.dict())
@@ -53,21 +54,6 @@ def update_retailer_deal_table(config: Config, new_deals: list[Book]):
         db_conn.register("_df", df)
         db_conn.execute("INSERT INTO retailer_deal SELECT * FROM _df;")
         db_conn.unregister("_df")
-
-
-def _retry_books(found_books: list[Book], all_books: list[Book]) -> list[Book]:
-    response = []
-    found_book_set = {f'{b.title} - {b.authors}' for b in found_books}
-    for book in all_books:
-        if ":" not in book.title:
-            continue
-
-        if f'{book.title} - {book.authors}' not in found_book_set:
-            alt_book = copy.deepcopy(book)
-            alt_book.title = alt_book.title.split(":")[0]
-            response.append(alt_book)
-
-    return response
 
 
 async def _get_books(config, retailer: Retailer, books: list[Book]) -> list[Book]:
@@ -100,13 +86,9 @@ async def _get_books(config, retailer: Retailer, books: list[Book]) -> list[Book
         elif not book.exists:
             unresolved_books.append(book)
 
-    if retry_books := _retry_books(response, books):
-        echo_info("Attempting to find missing books with alternate title")
-        response.extend(await _get_books(config, retailer, retry_books))
-    elif unresolved_books:
-        click.echo()
-        for book in unresolved_books:
-            echo_info(f"{book.title} by {book.authors} not found")
+    click.echo()
+    for book in unresolved_books:
+        echo_info(f"{book.title} by {book.authors} not found")
 
     return response
 
@@ -145,6 +127,34 @@ def _apply_proper_list_prices(books: list[Book]):
             book.list_price = max(book.current_price, list_price)
 
 
+def _get_retailer_relevant_tbr_books(
+    retailer: Retailer,
+    books: list[Book],
+    owned_book_title_map: dict[str, dict[BookFormat, Book]],
+) -> list[Book]:
+    """
+    Don't check on deals in a specified format that does not match the format the retailer sells.
+    Also, don't check on deals for a book if a copy is already owned in that same format.
+
+    :param retailer:
+    :param books:
+    :param owned_book_title_map:
+    :return:
+    """
+
+    response = []
+
+    for book in books:
+        owned_versions = owned_book_title_map[book.full_title_str]
+        if (
+            (book.format == BookFormat.NA or book.format == retailer.format)
+            and retailer.format not in owned_versions
+        ):
+            response.append(book)
+
+    return response
+
+
 async def get_latest_deals(config: Config):
     """
     Fetches the latest book deals from all tracked retailers for the user's TBR list.
@@ -164,18 +174,21 @@ async def get_latest_deals(config: Config):
 
     books: list[Book] = []
     tbr_books = await get_tbr_books(config)
+    owned_books = await get_owned_books(config)
+
+    owned_book_title_map: dict[str, dict[BookFormat, Book]] = defaultdict(dict)
+    for book in owned_books:
+        owned_book_title_map[book.full_title_str][book.format] = book
 
     for retailer_str in config.tracked_retailers:
         retailer = RETAILER_MAP[retailer_str]()
         await retailer.set_auth()
 
-        # Don't check on deals in a specified format
-        #   that does not match the format the retailer sells
-        relevant_tbr_books = [
-            book
-            for book in tbr_books
-            if book.format == BookFormat.NA or book.format == retailer.format
-        ]
+        relevant_tbr_books = _get_retailer_relevant_tbr_books(
+            retailer,
+            tbr_books,
+            owned_book_title_map,
+        )
 
         echo_info(f"Getting deals from {retailer.name}")
         click.echo("\n---------------")
