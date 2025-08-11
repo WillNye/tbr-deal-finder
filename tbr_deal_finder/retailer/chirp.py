@@ -84,10 +84,9 @@ class Chirp(Retailer):
             json.dump(response, f)
 
     async def get_book(
-        self, target: Book, runtime: datetime, semaphore: asyncio.Semaphore
+        self, target: Book, semaphore: asyncio.Semaphore
     ) -> Book:
         title = target.title
-        authors = target.authors
         async with semaphore:
             async with aiohttp.ClientSession() as http_client:
                 response = await http_client.request(
@@ -103,16 +102,8 @@ class Chirp(Retailer):
 
             audiobooks = response_body["data"]["audiobooks"]["objects"]
             if not audiobooks:
-                return Book(
-                    retailer=self.name,
-                    title=title,
-                    authors=authors,
-                    list_price=0,
-                    current_price=0,
-                    timepoint=runtime,
-                    format=BookFormat.AUDIOBOOK,
-                    exists=False,
-                )
+                target.exists = False
+                return target
 
             for book in audiobooks:
                 if not book["currentProduct"]:
@@ -123,26 +114,12 @@ class Chirp(Retailer):
                     book["displayTitle"] == title
                     and is_matching_authors(target.normalized_authors, normalized_authors)
                 ):
-                    return Book(
-                        retailer=self.name,
-                        title=title,
-                        authors=authors,
-                        list_price=currency_to_float(book["currentProduct"]["listingPrice"]),
-                        current_price=currency_to_float(book["currentProduct"]["discountPrice"]),
-                        timepoint=runtime,
-                        format=BookFormat.AUDIOBOOK,
-                    )
+                    target.list_price = currency_to_float(book["currentProduct"]["listingPrice"])
+                    target.current_price = currency_to_float(book["currentProduct"]["discountPrice"])
+                    return target
 
-            return Book(
-                retailer=self.name,
-                title=title,
-                authors=target.authors,
-                list_price=0,
-                current_price=0,
-                timepoint=runtime,
-                format=BookFormat.AUDIOBOOK,
-                exists=False,
-            )
+            target.exists = False
+            return target
 
     async def get_wishlist(self, config: Config) -> list[Book]:
         wishlist_books = []

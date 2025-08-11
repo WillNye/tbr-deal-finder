@@ -22,9 +22,9 @@ def update_retailer_deal_table(config: Config, new_deals: list[Book]):
     :param new_deals:
     """
 
-    # This could be done using a temp table for the new deals, but that feels like overkill
-    # I can't imagine there's ever going to be more than 5,000 books in someone's TBR
-    # If it were any larger we'd have bigger problems.
+    # This could be done using a temp table for the new deals, but that feels like overkill.
+    # I can't imagine there's ever going to be more than 5,000 books in someone's TBR.
+    # If it were any larger, we'd have bigger problems.
     active_deal_map = {deal.deal_id: deal for deal in get_active_deals()}
     # Dirty trick to ensure uniqueness in request
     new_deals = list({nd.deal_id: nd for nd in new_deals}.values())
@@ -74,9 +74,13 @@ async def _get_books(config, retailer: Retailer, books: list[Book]) -> list[Book
     semaphore = asyncio.Semaphore(10)
     response = []
     unresolved_books = []
+    books = [copy.deepcopy(book) for book in books]
+    for book in books:
+        book.retailer = retailer.name
+        book.format = retailer.format
 
     tasks = [
-        retailer.get_book(copy.deepcopy(book), config.run_time, semaphore)
+        retailer.get_book(book, semaphore)
         for book in books
     ]
     results = await tqdm_asyncio.gather(*tasks, desc=f"Getting latest prices from {retailer.name}")

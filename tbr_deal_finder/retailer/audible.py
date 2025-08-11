@@ -1,7 +1,6 @@
 import asyncio
 import math
 import os.path
-from datetime import datetime
 from textwrap import dedent
 import readline  # type: ignore
 
@@ -94,7 +93,6 @@ class Audible(Retailer):
     async def get_book(
         self,
         target: Book,
-        runtime: datetime,
         semaphore: asyncio.Semaphore
     ) -> Book:
         title = target.title
@@ -114,27 +112,16 @@ class Audible(Retailer):
             for product in match.get("products", []):
                 if product["title"] != title:
                     continue
+                try:
+                    target.list_price = product["price"]["list_price"]["base"]
+                    target.current_price = product["price"]["lowest_price"]["base"]
+                    target.exists = True
+                    return target
+                except KeyError:
+                    continue
 
-                return Book(
-                    retailer=self.name,
-                    title=title,
-                    authors=authors,
-                    list_price=product["price"]["list_price"]["base"],
-                    current_price=product["price"]["lowest_price"]["base"],
-                    timepoint=runtime,
-                    format=BookFormat.AUDIOBOOK
-                )
-
-            return Book(
-                retailer=self.name,
-                title=title,
-                authors=authors,
-                list_price=0,
-                current_price=0,
-                timepoint=runtime,
-                format=BookFormat.AUDIOBOOK,
-                exists=False,
-            )
+            target.exists = False
+            return target
 
     async def get_wishlist(self, config: Config) -> list[Book]:
         wishlist_books = []

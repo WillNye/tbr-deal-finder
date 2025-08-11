@@ -80,7 +80,7 @@ class LibroFM(Retailer):
         with open(auth_path, "w") as f:
             json.dump(response, f)
 
-    async def get_book_isbn(self, book: Book, runtime: datetime, semaphore: asyncio.Semaphore) -> Book:
+    async def get_book_isbn(self, book: Book, semaphore: asyncio.Semaphore) -> Book:
         # runtime isn't used but get_book_isbn must follow the get_book method signature.
 
         title = book.title
@@ -109,24 +109,16 @@ class LibroFM(Retailer):
         return book
 
     async def get_book(
-        self, target: Book, runtime: datetime, semaphore: asyncio.Semaphore
+        self, target: Book, semaphore: asyncio.Semaphore
     ) -> Book:
         if target.format == BookFormat.AUDIOBOOK and not target.audiobook_isbn:
             # When "format" is AUDIOBOOK here that means the target was pulled from an audiobook retailer wishlist
             # In this flow, there is no attempt to resolve the isbn ahead of time, so it's done here instead.
-            await self.get_book_isbn(target, runtime, semaphore)
+            await self.get_book_isbn(target, semaphore)
 
         if not target.audiobook_isbn:
-            return Book(
-                retailer=self.name,
-                title=target.title,
-                authors=target.authors,
-                list_price=0,
-                current_price=0,
-                timepoint=runtime,
-                format=BookFormat.AUDIOBOOK,
-                exists=False,
-            )
+            target.exists = False
+            return target
 
         async with semaphore:
             response = await self.make_request(
@@ -135,26 +127,12 @@ class LibroFM(Retailer):
             )
 
         if response:
-            return Book(
-                retailer=self.name,
-                title=target.title,
-                authors=target.authors,
-                list_price=target.audiobook_list_price,
-                current_price=currency_to_float(response["data"]["purchase_info"]["price"]),
-                timepoint=runtime,
-                format=BookFormat.AUDIOBOOK,
-            )
+            target.list_price = target.audiobook_list_price
+            target.current_price = currency_to_float(response["data"]["purchase_info"]["price"])
+            return target
 
-        return Book(
-            retailer=self.name,
-            title=target.title,
-            authors=target.authors,
-            list_price=0,
-            current_price=0,
-            timepoint=runtime,
-            format=BookFormat.AUDIOBOOK,
-            exists=False,
-        )
+        target.exists = False
+        return target
 
     async def get_wishlist(self, config: Config) -> list[Book]:
         wishlist_books = []

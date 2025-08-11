@@ -2,7 +2,6 @@ import asyncio
 import csv
 import shutil
 import tempfile
-from datetime import datetime
 from typing import Callable, Awaitable, Optional
 
 from tqdm.asyncio import tqdm_asyncio
@@ -48,7 +47,7 @@ def requires_audiobook_list_price_default(config: Config) -> bool:
 async def _maybe_set_column_for_library_exports(
     config: Config,
     attr_name: str,
-    get_book_callable: Callable[[Book, datetime, asyncio.Semaphore], Awaitable[Book]],
+    get_book_callable: Callable[[Book, asyncio.Semaphore], Awaitable[Book]],
     column_name: Optional[str] = None,
 ):
     """Adds a new column to all library exports that are missing it.
@@ -111,7 +110,7 @@ async def _maybe_set_column_for_library_exports(
     # Responsibility is on the callable here
     enriched_books = await tqdm_asyncio.gather(
         *[
-            get_book_callable(book, config.run_time, semaphore) for book in books_requiring_check_map.values()
+            get_book_callable(book, semaphore) for book in books_requiring_check_map.values()
         ],
         desc=f"Getting required {human_readable_name} info"
     )
