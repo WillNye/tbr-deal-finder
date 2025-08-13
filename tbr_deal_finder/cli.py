@@ -9,11 +9,11 @@ import click
 import questionary
 
 from tbr_deal_finder.config import Config
-from tbr_deal_finder.library_exports import maybe_enrich_library_exports
 from tbr_deal_finder.migrations import make_migrations
 from tbr_deal_finder.book import get_deals_found_at, print_books, get_active_deals
 from tbr_deal_finder.retailer import RETAILER_MAP
 from tbr_deal_finder.retailer_deal import get_latest_deals
+from tbr_deal_finder.tracked_books import reprocess_incomplete_tbr_books
 from tbr_deal_finder.utils import (
     echo_err,
     echo_info,
@@ -180,6 +180,10 @@ def _set_config() -> Config:
 def setup():
     _set_config()
 
+    # Retailers may have changed causing some books to need reprocessing
+    config = Config.load()
+    reprocess_incomplete_tbr_books(config)
+
 
 @cli.command()
 def latest_deals():
@@ -188,8 +192,6 @@ def latest_deals():
         config = Config.load()
     except FileNotFoundError:
         config = _set_config()
-
-    asyncio.run(maybe_enrich_library_exports(config))
 
     db_conn = get_duckdb_conn()
     results = execute_query(

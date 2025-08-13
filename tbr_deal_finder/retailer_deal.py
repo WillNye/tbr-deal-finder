@@ -8,7 +8,6 @@ from tqdm.asyncio import tqdm_asyncio
 
 from tbr_deal_finder.book import Book, get_active_deals, BookFormat
 from tbr_deal_finder.config import Config
-from tbr_deal_finder.owned_books import get_owned_books
 from tbr_deal_finder.tracked_books import get_tbr_books
 from tbr_deal_finder.retailer import RETAILER_MAP
 from tbr_deal_finder.retailer.models import Retailer
@@ -134,26 +133,19 @@ def _apply_proper_list_prices(books: list[Book]):
 def _get_retailer_relevant_tbr_books(
     retailer: Retailer,
     books: list[Book],
-    owned_book_title_map: dict[str, dict[BookFormat, Book]],
 ) -> list[Book]:
     """
     Don't check on deals in a specified format that does not match the format the retailer sells.
-    Also, don't check on deals for a book if a copy is already owned in that same format.
 
     :param retailer:
     :param books:
-    :param owned_book_title_map:
     :return:
     """
 
     response = []
 
     for book in books:
-        owned_versions = owned_book_title_map[book.full_title_str]
-        if (
-            (book.format == BookFormat.NA or book.format == retailer.format)
-            and retailer.format not in owned_versions
-        ):
+        if book.format == BookFormat.NA or book.format == retailer.format:
             response.append(book)
 
     return response
@@ -178,11 +170,6 @@ async def get_latest_deals(config: Config):
 
     books: list[Book] = []
     tbr_books = await get_tbr_books(config)
-    owned_books = await get_owned_books(config)
-
-    owned_book_title_map: dict[str, dict[BookFormat, Book]] = defaultdict(dict)
-    for book in owned_books:
-        owned_book_title_map[book.full_title_str][book.format] = book
 
     for retailer_str in config.tracked_retailers:
         retailer = RETAILER_MAP[retailer_str]()
@@ -191,7 +178,6 @@ async def get_latest_deals(config: Config):
         relevant_tbr_books = _get_retailer_relevant_tbr_books(
             retailer,
             tbr_books,
-            owned_book_title_map,
         )
 
         echo_info(f"Getting deals from {retailer.name}")
