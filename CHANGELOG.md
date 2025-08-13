@@ -1,6 +1,19 @@
 
 # Change Log
 
+---
+
+## 0.1.8 (August 13, 2025)
+
+Notes: 
+* Improved performance for tracking on libro
+* Preparing EBook support
+
+BUG FIXES:
+* Fixed initial login issue in libro.fm
+
+---
+
 ## 0.1.7 (July 31, 2025)
 
 Notes: 
