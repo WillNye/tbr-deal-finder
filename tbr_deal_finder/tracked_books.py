@@ -1,19 +1,18 @@
 import asyncio
+import copy
 import csv
+from collections import defaultdict
+from typing import Callable, Awaitable, Optional
 
+import pandas as pd
 from tqdm.asyncio import tqdm_asyncio
 
 from tbr_deal_finder.book import Book, BookFormat, get_title_id
-from tbr_deal_finder.retailer import Chirp, RETAILER_MAP
+from tbr_deal_finder.owned_books import get_owned_books
+from tbr_deal_finder.retailer import Chirp, RETAILER_MAP, LibroFM
 from tbr_deal_finder.config import Config
-from tbr_deal_finder.library_exports import (
-    get_book_authors,
-    get_book_title,
-    is_tbr_book,
-    requires_audiobook_list_price_default
-)
 from tbr_deal_finder.retailer.models import Retailer
-from tbr_deal_finder.utils import currency_to_float
+from tbr_deal_finder.utils import execute_query, get_duckdb_conn
 
 
 def _library_export_tbr_books(config: Config, tbr_book_map: dict[str: Book]):
@@ -35,7 +34,7 @@ def _library_export_tbr_books(config: Config, tbr_book_map: dict[str: Book]):
                 authors = get_book_authors(book_dict)
 
                 key = get_title_id(title, authors, BookFormat.NA)
-                if key in tbr_book_map and tbr_book_map[key].audiobook_isbn:
+                if key in tbr_book_map:
                     continue
 
                 tbr_book_map[key] = Book(
@@ -46,31 +45,7 @@ def _library_export_tbr_books(config: Config, tbr_book_map: dict[str: Book]):
                     current_price=0,
                     timepoint=config.run_time,
                     format=BookFormat.NA,
-                    audiobook_isbn=book_dict.get("audiobook_isbn"),
-                    audiobook_list_price=currency_to_float(book_dict.get("audiobook_list_price") or 0),
                 )
-
-
-async def _apply_dynamic_audiobook_list_price(config: Config, tbr_book_map: dict[str: Book]):
-    target_books = [
-        book
-        for book in tbr_book_map.values()
-        if book.format == BookFormat.AUDIOBOOK
-    ]
-    if not target_books:
-        return
-
-    chirp = Chirp()
-    semaphore = asyncio.Semaphore(5)
-    books_with_pricing: list[Book] = await tqdm_asyncio.gather(
-        *[
-            chirp.get_book(book, config.run_time, semaphore)
-            for book in target_books
-        ],
-        desc=f"Getting list prices for Libro.FM wishlist"
-    )
-    for book in books_with_pricing:
-        tbr_book_map[book.title_id].audiobook_list_price = book.list_price
 
 
 async def _retailer_wishlist(config: Config, tbr_book_map: dict[str: Book]):
@@ -102,19 +77,244 @@ async def _retailer_wishlist(config: Config, tbr_book_map: dict[str: Book]):
 
             tbr_book_map[key] = book
 
-    if requires_audiobook_list_price_default(config):
-        await _apply_dynamic_audiobook_list_price(config, tbr_book_map)
+
+async def _get_raw_tbr_books(config: Config) -> list[Book]:
+    """Gets books in any library export or tracked retailer wishlist
+
+    Excludes books in the format they are owned.
+    Example: User owns Dungeon Crawler Carl Audiobook but it's on the user TBR.
+        Result - Deals will be tracked for the Dungeon Crawler Carl EBook (if tracking kindle deals)
+
+    :param config:
+    :return:
+    """
+
+    owned_books = await get_owned_books(config)
+    tracking_audiobooks = config.is_tracking_format(book_format=BookFormat.AUDIOBOOK)
+    tracking_ebooks = config.is_tracking_format(book_format=BookFormat.EBOOK)
+
+    tbr_book_map: dict[str: Book] = {}
+    # Get TBRs specified in the user library (StoryGraph/GoodReads) export
+    _library_export_tbr_books(config, tbr_book_map)
+    # Pull wishlist from tracked retailers
+    await _retailer_wishlist(config, tbr_book_map)
+    raw_tbr_books = list(tbr_book_map.values())
+
+    response: list[Book] = []
+
+    owned_book_title_map: dict[str, set] = defaultdict(set)
+    for book in owned_books:
+        owned_book_title_map[book.full_title_str].add(book.format)
+
+    for book in raw_tbr_books:
+        owned_formats = owned_book_title_map.get(book.full_title_str)
+        if not owned_formats:
+            response.append(book)
+        elif BookFormat.NA in owned_formats:
+            continue
+        elif tracking_audiobooks and BookFormat.AUDIOBOOK not in owned_formats:
+            book.format = BookFormat.AUDIOBOOK
+            response.append(book)
+        elif tracking_ebooks and BookFormat.EBOOK not in owned_formats:
+            book.format = BookFormat.EBOOK
+            response.append(book)
+
+    return response
+
+
+async def _set_tbr_book_attr(
+    tbr_books: list[Book],
+    target_attr: str,
+    get_book_callable: Callable[[Book, asyncio.Semaphore], Awaitable[Book]],
+    tbr_book_attr: Optional[str] = None
+):
+    if not tbr_books:
+        return
+
+    if not tbr_book_attr:
+        tbr_book_attr = target_attr
+
+    tbr_books_map = {b.full_title_str: b for b in tbr_books}
+    tbr_books_copy = copy.deepcopy(tbr_books)
+    semaphore = asyncio.Semaphore(5)
+    human_readable_name = target_attr.replace("_", " ").title()
+
+    # Get books with the appropriate transform applied
+    # Responsibility is on the callable here
+    enriched_books = await tqdm_asyncio.gather(
+        *[
+            get_book_callable(book, semaphore) for book in tbr_books_copy
+        ],
+        desc=f"Getting required {human_readable_name} info"
+    )
+    for enriched_book in enriched_books:
+        book = tbr_books_map[enriched_book.full_title_str]
+        setattr(
+            book,
+            tbr_book_attr,
+            getattr(enriched_book, target_attr)
+        )
+
+
+def _requires_audiobook_list_price(config: Config):
+    return bool(
+        "Libro.FM" in config.tracked_retailers
+        and "Audible" not in config.tracked_retailers
+        and "Chirp" not in config.tracked_retailers
+    )
+
+
+async def _maybe_set_audiobook_list_price(config: Config, new_tbr_books: list[Book]):
+    """Set a default list price for audiobooks
+
+    Only set if not currently set and the only audiobook retailer is Libro.FM
+    Libro.FM doesn't include the actual default price in its response, so this grabs the price reported by Chirp.
+    Chirp doesn't require a login to get this price info making it ideal in this instance.
+
+    :param config:
+    :return:
+    """
+    if not _requires_audiobook_list_price(config):
+        return
+
+    chirp = Chirp()
+    relevant_tbr_books = [
+        book
+        for book in new_tbr_books
+        if book.format in [BookFormat.AUDIOBOOK, BookFormat.NA]
+    ]
+
+    await _set_tbr_book_attr(
+        relevant_tbr_books,
+        "list_price",
+        chirp.get_book,
+        "audiobook_list_price"
+    )
+
+
+async def _maybe_set_audiobook_isbn(config: Config, new_tbr_books: list[Book]):
+    """To get the price from Libro.fm for a book, you need its ISBN
+
+    As opposed to trying to get that every time latest-deals is run
+        we're just updating the export csv once to include the ISBN.
+
+    """
+    if "Libro.FM" not in config.tracked_retailers:
+        return
+
+    libro_fm = LibroFM()
+    await libro_fm.set_auth()
+
+    relevant_tbr_books = [
+        book
+        for book in new_tbr_books
+        if book.format in [BookFormat.AUDIOBOOK, BookFormat.NA]
+    ]
+
+    await _set_tbr_book_attr(
+        relevant_tbr_books,
+        "audiobook_isbn",
+        libro_fm.get_book_isbn,
+    )
+
+
+def get_book_authors(book: dict) -> str:
+    if authors := book.get('Authors'):
+        return authors
+
+    authors = book['Author']
+    if additional_authors := book.get("Additional Authors"):
+        authors = f"{authors}, {additional_authors}"
+
+    return authors
+
+
+def get_book_title(book: dict) -> str:
+    title = book['Title']
+    return title.split("(")[0].strip()
+
+
+def is_tbr_book(book: dict) -> bool:
+    if "Read Status" in book:
+        return book["Read Status"] == "to-read"
+    elif "Bookshelves" in book:
+        return "to-read" in book["Bookshelves"]
+    else:
+        return True
+
+
+def reprocess_incomplete_tbr_books(config: Config):
+    db_conn = get_duckdb_conn()
+
+    if config.is_tracking_format(BookFormat.EBOOK):
+        # Replace any tbr_books missing required attr
+        db_conn.execute(
+            "DELETE FROM tbr_book WHERE ebook_asin IS NULL AND format != $book_format",
+            parameters=dict(book_format=BookFormat.AUDIOBOOK.value)
+        )
+
+    if LibroFM().name in config.tracked_retailers:
+        # Replace any tbr_books missing required attr
+        db_conn.execute(
+            "DELETE FROM tbr_book WHERE audiobook_isbn IS NULL AND format != $book_format",
+            parameters=dict(book_format=BookFormat.EBOOK.value)
+        )
+
+    if _requires_audiobook_list_price(config):
+        # Replace any tbr_books missing required attr
+        db_conn.execute(
+            "DELETE FROM tbr_book WHERE audiobook_list_price IS NULL AND format != $book_format",
+            parameters=dict(book_format=BookFormat.EBOOK.value)
+        )
+
+
+async def sync_tbr_books(config: Config):
+    raw_tbr_books = await _get_raw_tbr_books(config)
+    db_conn = get_duckdb_conn()
+
+    if not raw_tbr_books:
+        return
+
+    df = pd.DataFrame([book.tbr_dict() for book in raw_tbr_books])
+    db_conn.register("_df", df)
+    db_conn.execute("CREATE OR REPLACE TABLE _latest_tbr_book AS SELECT * FROM _df;")
+    db_conn.unregister("_df")
+
+    # Remove books no longer on user tbr
+    db_conn.execute(
+        "DELETE FROM tbr_book WHERE book_id NOT IN (SELECT book_id FROM _latest_tbr_book)"
+    )
+
+    # Remove books from _latest_tbr_book for further processing for books already in tbr_book
+    db_conn.execute(
+        "DELETE FROM _latest_tbr_book WHERE book_id IN (SELECT book_id FROM tbr_book)"
+    )
+
+    new_tbr_book_data = execute_query(
+        db_conn,
+        "SELECT * EXCLUDE(book_id) FROM _latest_tbr_book"
+    )
+
+    new_tbr_books = [Book(retailer="N/A", timepoint=config.run_time, **b) for b in new_tbr_book_data]
+    if not new_tbr_books:
+        return
+
+    await _maybe_set_audiobook_list_price(config, new_tbr_books)
+    await _maybe_set_audiobook_isbn(config, new_tbr_books)
+
+    df = pd.DataFrame([book.tbr_dict() for book in new_tbr_books])
+    db_conn.register("_df", df)
+    db_conn.execute("INSERT INTO tbr_book SELECT * FROM _df;")
+    db_conn.unregister("_df")
 
 
 async def get_tbr_books(config: Config) -> list[Book]:
-    tbr_book_map: dict[str: Book] = {}
+    await sync_tbr_books(config)
 
-    # Get TBRs specified in the user library (StoryGraph/GoodReads) export
-    _library_export_tbr_books(config, tbr_book_map)
+    db_conn = get_duckdb_conn()
+    tbr_book_data = execute_query(
+        db_conn,
+        "SELECT * EXCLUDE(book_id) FROM tbr_book"
+    )
 
-    # Pull wishlist from tracked retailers
-    await _retailer_wishlist(config, tbr_book_map)
-
-    return list(tbr_book_map.values())
-
-
+    return [Book(retailer="N/A", timepoint=config.run_time, **b) for b in tbr_book_data]
