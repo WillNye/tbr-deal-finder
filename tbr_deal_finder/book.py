@@ -1,8 +1,7 @@
-import dataclasses
 import re
 from datetime import datetime
 from enum import Enum
-from typing import Optional, Union
+from typing import Union
 
 import click
 from Levenshtein import ratio
@@ -15,44 +14,45 @@ _AUTHOR_RE = re.compile(r'[^a-zA-Z0-9]')
 
 class BookFormat(Enum):
     AUDIOBOOK = "Audiobook"
-    NA = "N/A"  # When format does not matter
+    EBOOK = "E-Book"
+    NA = "N/A"  # When the format doesn't matter
 
 
-@dataclasses.dataclass
-class Book:    
-    retailer: str
-    title: str
-    authors: str
-    list_price: float
-    current_price: float
-    timepoint: datetime
-    format: Union[BookFormat, str]
+class Book:
 
-    # Metadata really only used for tracked books.
-    # See get_tbr_books for more context
-    audiobook_isbn: str = None
-    audiobook_list_price: float = 0
+    def __init__(
+        self,
+        retailer: str,
+        title: str,
+        authors: str,
+        timepoint: datetime,
+        format: Union[BookFormat, str],
+        list_price: float = 0,
+        current_price: float = 0,
+        ebook_asin: str = None,
+        audiobook_isbn: str = None,
+        audiobook_list_price: float = 0,
+        deleted: bool = False,
+        exists: bool = True,
+    ):
+        self.retailer = retailer
+        self.title = title.split(":")[0].split("(")[0].strip()
+        self.authors = authors
+        self.timepoint = timepoint
 
-    deleted: bool = False
+        self.ebook_asin = ebook_asin
+        self.audiobook_isbn = audiobook_isbn
+        self.audiobook_list_price = audiobook_list_price
+        self.deleted = deleted
+        self.exists = exists
 
-    deal_id: Optional[str] = None
-    exists: bool = True
-    normalized_authors: list[str] = None
+        self.list_price = list_price
+        self.current_price = current_price
+        self.normalized_authors = get_normalized_authors(authors)
 
-    def __post_init__(self):
-        self.current_price = round(self.current_price, 2)
-        self.list_price = round(self.list_price, 2)
-        self.normalized_authors = get_normalized_authors(self.authors)
-
-        # Strip the title down to its most basic repr
-        # Improves hit rate on retailers
-        self.title = self.title.split(":")[0].split("(")[0].strip()
-
-        if not self.deal_id:
-            self.deal_id = f"{self.title}__{self.normalized_authors}__{self.format}__{self.retailer}"
-
-        if isinstance(self.format, str):
-            self.format = BookFormat(self.format)
+        if isinstance(format, str):
+            format = BookFormat(format)
+        self.format = format
 
     def discount(self) -> int:
         return int((self.list_price/self.current_price - 1) * 100)
@@ -62,12 +62,32 @@ class Book:
         return f"{Config.currency_symbol()}{price:.2f}"
 
     @property
+    def deal_id(self) -> str:
+        return f"{self.title}__{self.normalized_authors}__{self.format}__{self.retailer}"
+
+    @property
     def title_id(self) -> str:
         return f"{self.title}__{self.normalized_authors}__{self.format}"
 
     @property
     def full_title_str(self) -> str:
         return f"{self.title}__{self.normalized_authors}"
+
+    @property
+    def current_price(self) -> float:
+        return self._current_price
+
+    @current_price.setter
+    def current_price(self, price: float):
+        self._current_price = round(price, 2)
+
+    @property
+    def list_price(self) -> float:
+        return self._list_price
+
+    @list_price.setter
+    def list_price(self, price: float):
+        self._list_price = round(price, 2)
 
     def list_price_string(self):
         return self.price_to_string(self.list_price)
@@ -81,17 +101,31 @@ class Book:
         title = self.title
         if len(self.title) > 75:
             title = f"{title[:75]}..."
-        return f"{title} by {self.authors} - {price} - {self.discount()}% Off at {self.retailer} - {book_format}"
+        return f"{title} by {self.authors} - {price} - {self.discount()}% Off at {self.retailer}"
 
     def dict(self):
-        response = dataclasses.asdict(self)
-        response["format"] = self.format.value
-        del response["audiobook_isbn"]
-        del response["audiobook_list_price"]
-        del response["exists"]
-        del response["normalized_authors"]
+        return {
+            "retailer": self.retailer,
+            "title": self.title,
+            "authors": self.authors,
+            "list_price": self.list_price,
+            "current_price": self.current_price,
+            "timepoint": self.timepoint,
+            "format": self.format.value,
+            "deleted": self.deleted,
+            "deal_id": self.deal_id,
+        }
 
-        return response
+    def tbr_dict(self):
+        return {
+            "title": self.title,
+            "authors": self.authors,
+            "format": self.format.value,
+            "ebook_asin": self.ebook_asin,
+            "audiobook_isbn": self.audiobook_isbn,
+            "audiobook_list_price": self.audiobook_list_price,
+            "book_id": self.title_id,
+        }
 
 
 def get_deals_found_at(timepoint: datetime) -> list[Book]:

@@ -1,6 +1,5 @@
 import abc
 import asyncio
-from datetime import datetime
 
 from tbr_deal_finder.book import Book, BookFormat
 from tbr_deal_finder.config import Config
@@ -29,7 +28,7 @@ class Retailer(abc.ABC):
         raise NotImplementedError
 
     async def get_book(
-            self, target: Book, runtime: datetime, semaphore: asyncio.Semaphore
+            self, target: Book, semaphore: asyncio.Semaphore
     ) -> Book:
         """Get book information from the retailer.
 

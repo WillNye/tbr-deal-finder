@@ -38,7 +38,7 @@ Track price drops and find deals on books in your TBR (To Be Read) and wishlist 
 1. If it's not already on your computer, download Python https://www.python.org/downloads/
    1. tbr-deal-finder requires Python3.13 or higher
 2. Optional: Install and use virtualenv
-3. Open your Terminal/Commmand Prompt
+3. Open your Terminal/Command Prompt
 4. Run `pip3.13 install tbr-deal-finder`
 
 ### UV
