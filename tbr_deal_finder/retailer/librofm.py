@@ -76,7 +76,7 @@ class LibroFM(Retailer):
                 "password": click.prompt("Libro FM Password", hide_input=True),
             }
         )
-        self.auth_token = response
+        self.auth_token = response["access_token"]
         with open(auth_path, "w") as f:
             json.dump(response, f)
 
@@ -111,11 +111,6 @@ class LibroFM(Retailer):
     async def get_book(
         self, target: Book, semaphore: asyncio.Semaphore
     ) -> Book:
-        if target.format == BookFormat.AUDIOBOOK and not target.audiobook_isbn:
-            # When "format" is AUDIOBOOK here that means the target was pulled from an audiobook retailer wishlist
-            # In this flow, there is no attempt to resolve the isbn ahead of time, so it's done here instead.
-            await self.get_book_isbn(target, semaphore)
-
         if not target.audiobook_isbn:
             target.exists = False
             return target
