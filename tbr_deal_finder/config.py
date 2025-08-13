@@ -83,6 +83,16 @@ class Config:
     def tracked_retailers_str(self) -> str:
         return ", ".join(self.tracked_retailers)
 
+    def is_tracking_format(self, book_format) -> bool:
+        from tbr_deal_finder.retailer import RETAILER_MAP
+
+        for retailer_str in self.tracked_retailers:
+            retailer = RETAILER_MAP[retailer_str]()
+            if retailer.format == book_format:
+                return True
+
+        return False
+
     def set_library_export_paths(self, library_export_paths: Union[str, list[str]]):
         if not library_export_paths:
             self.library_export_paths = []

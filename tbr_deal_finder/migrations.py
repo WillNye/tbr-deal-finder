@@ -46,6 +46,22 @@ _MIGRATIONS = [
             );
             """
     ),
+    TableMigration(
+        version=1,
+        table_name="tbr_book",
+        sql="""
+            CREATE TABLE tbr_book
+            (
+                title                VARCHAR,
+                authors              VARCHAR,
+                format               VARCHAR,
+                ebook_asin           VARCHAR,
+                audiobook_isbn       VARCHAR,
+                audiobook_list_price FLOAT,
+                book_id              VARCHAR
+            );
+            """
+    ),
 ]
 
 
