@@ -14,6 +14,9 @@ Notes:
 * Improvements to title matching for Audible & Chirp 
 * Improved request performance for Chirp & Libro
 
+BUG FIXES:
+* Fixed breaking import on Windows systems
+
 ---
 
 ## 0.1.8 (August 13, 2025)

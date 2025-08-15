@@ -1,6 +1,5 @@
 import asyncio
 import math
-import readline  # type: ignore
 
 from tbr_deal_finder.config import Config
 from tbr_deal_finder.retailer.amazon import Amazon
