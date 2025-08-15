@@ -1,9 +1,15 @@
+import sys
 import os.path
 
 import audible
 import click
 from audible.login import build_init_cookies
 from textwrap import dedent
+
+if sys.platform != 'win32':
+    # Breaks Windows support but required for Mac
+    # Untested on Linux
+    import readline  # type: ignore
 
 from tbr_deal_finder import TBR_DEALS_PATH
 from tbr_deal_finder.config import Config

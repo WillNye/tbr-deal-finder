@@ -3,6 +3,22 @@
 
 ---
 
+## 0.2.0 (August 15, 2025)
+
+Notes: 
+* Added foundational Kindle support
+  * Library support is undecided right now
+    * Unable to find the endpoint
+  * Wishlist support is undecided right now
+    * Unable to find the endpoint 
+* Improvements to title matching for Audible & Chirp 
+* Improved request performance for Chirp & Libro
+
+BUG FIXES:
+* Fixed breaking import on Windows systems
+
+---
+
 ## 0.1.8 (August 13, 2025)
 
 Notes: 

@@ -8,7 +8,7 @@ from Levenshtein import ratio
 from unidecode import unidecode
 
 from tbr_deal_finder.config import Config
-from tbr_deal_finder.utils import get_duckdb_conn, execute_query, get_query_by_name
+from tbr_deal_finder.utils import get_duckdb_conn, execute_query, get_query_by_name, echo_info
 
 _AUTHOR_RE = re.compile(r'[^a-zA-Z0-9]')
 
@@ -36,7 +36,7 @@ class Book:
         exists: bool = True,
     ):
         self.retailer = retailer
-        self.title = title.split(":")[0].split("(")[0].strip()
+        self.title = get_normalized_title(title)
         self.authors = authors
         self.timepoint = timepoint
 
@@ -148,13 +148,26 @@ def get_active_deals() -> list[Book]:
 
 
 def print_books(books: list[Book]):
-    prior_title_id = books[0].title_id
-    for book in books:
-        if prior_title_id != book.title_id:
-            prior_title_id = book.title_id
-            click.echo()
+    audiobooks = [book for book in books if book.format == BookFormat.AUDIOBOOK]
+    audiobooks = sorted(audiobooks, key=lambda book: book.deal_id)
 
-        click.echo(str(book))
+    ebooks = [book for book in books if book.format == BookFormat.EBOOK]
+    ebooks = sorted(ebooks, key=lambda book: book.deal_id)
+
+    for books_in_format in [audiobooks, ebooks]:
+        if not books_in_format:
+            continue
+
+        init_book = books_in_format[0]
+        echo_info(f"\n\n{init_book.format.value} Deals:")
+
+        prior_title_id = init_book.title_id
+        for book in books_in_format:
+            if prior_title_id != book.title_id:
+                prior_title_id = book.title_id
+                click.echo()
+
+            click.echo(str(book))
 
 
 def get_full_title_str(title: str, authors: Union[list, str]) -> str:
@@ -163,6 +176,10 @@ def get_full_title_str(title: str, authors: Union[list, str]) -> str:
 
 def get_title_id(title: str, authors: Union[list, str], book_format: BookFormat) -> str:
     return f"{title}__{get_normalized_authors(authors)}__{book_format.value}"
+
+
+def get_normalized_title(title: str) -> str:
+    return title.split(":")[0].split("(")[0].strip()
 
 
 def get_normalized_authors(authors: Union[str, list[str]]) -> list[str]:
