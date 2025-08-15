@@ -19,6 +19,9 @@ Track price drops and find deals on books in your TBR (To Be Read) and wishlist 
 * Chirp
 * Libro.fm
 
+### EBooks
+* Kindle
+
 ### Locales
 * US
 * CA
