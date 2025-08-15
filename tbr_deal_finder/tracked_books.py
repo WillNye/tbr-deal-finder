@@ -9,7 +9,7 @@ from tqdm.asyncio import tqdm_asyncio
 
 from tbr_deal_finder.book import Book, BookFormat, get_title_id
 from tbr_deal_finder.owned_books import get_owned_books
-from tbr_deal_finder.retailer import Chirp, RETAILER_MAP, LibroFM
+from tbr_deal_finder.retailer import Chirp, RETAILER_MAP, LibroFM, Kindle
 from tbr_deal_finder.config import Config
 from tbr_deal_finder.retailer.models import Retailer
 from tbr_deal_finder.utils import execute_query, get_duckdb_conn
@@ -194,10 +194,6 @@ async def _maybe_set_audiobook_list_price(config: Config, new_tbr_books: list[Bo
 
 async def _maybe_set_audiobook_isbn(config: Config, new_tbr_books: list[Book]):
     """To get the price from Libro.fm for a book, you need its ISBN
-
-    As opposed to trying to get that every time latest-deals is run
-        we're just updating the export csv once to include the ISBN.
-
     """
     if "Libro.FM" not in config.tracked_retailers:
         return
@@ -215,6 +211,28 @@ async def _maybe_set_audiobook_isbn(config: Config, new_tbr_books: list[Book]):
         relevant_tbr_books,
         "audiobook_isbn",
         libro_fm.get_book_isbn,
+    )
+
+
+async def _maybe_set_ebook_asin(config: Config, new_tbr_books: list[Book]):
+    """To get the price from kindle for a book, you need its asin
+    """
+    if "Kindle" not in config.tracked_retailers:
+        return
+
+    kindle = Kindle()
+    await kindle.set_auth()
+
+    relevant_tbr_books = [
+        book
+        for book in new_tbr_books
+        if book.format in [BookFormat.EBOOK, BookFormat.NA]
+    ]
+
+    await _set_tbr_book_attr(
+        relevant_tbr_books,
+        "ebook_asin",
+        kindle.get_book_asin,
     )
 
 
@@ -301,6 +319,7 @@ async def sync_tbr_books(config: Config):
 
     await _maybe_set_audiobook_list_price(config, new_tbr_books)
     await _maybe_set_audiobook_isbn(config, new_tbr_books)
+    await _maybe_set_ebook_asin(config, new_tbr_books)
 
     df = pd.DataFrame([book.tbr_dict() for book in new_tbr_books])
     db_conn.register("_df", df)
