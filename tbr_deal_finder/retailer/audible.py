@@ -4,7 +4,7 @@ import readline  # type: ignore
 
 from tbr_deal_finder.config import Config
 from tbr_deal_finder.retailer.amazon import Amazon
-from tbr_deal_finder.book import Book, BookFormat
+from tbr_deal_finder.book import Book, BookFormat, get_normalized_title
 
 
 class Audible(Amazon):
@@ -37,7 +37,7 @@ class Audible(Amazon):
             )
 
             for product in match.get("products", []):
-                if product["title"] != title:
+                if get_normalized_title(product["title"]) != title:
                     continue
                 try:
                     target.list_price = product["price"]["list_price"]["base"]

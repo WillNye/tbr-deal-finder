@@ -4,17 +4,16 @@ import os
 import urllib.parse
 from datetime import datetime, timedelta
 
-import aiohttp
 import click
 
 from tbr_deal_finder import TBR_DEALS_PATH
 from tbr_deal_finder.config import Config
-from tbr_deal_finder.retailer.models import Retailer
-from tbr_deal_finder.book import Book, BookFormat, get_normalized_authors, is_matching_authors
+from tbr_deal_finder.retailer.models import AioHttpSession, Retailer
+from tbr_deal_finder.book import Book, BookFormat, get_normalized_authors, is_matching_authors, get_normalized_title
 from tbr_deal_finder.utils import currency_to_float
 
 
-class LibroFM(Retailer):
+class LibroFM(AioHttpSession, Retailer):
     BASE_URL = "https://libro.fm"
     USER_AGENT = "okhttp/3.14.9"
     USER_AGENT_DOWNLOAD = (
@@ -27,6 +26,8 @@ class LibroFM(Retailer):
     )
 
     def __init__(self):
+        super().__init__()
+
         self.auth_token = None
 
     @property
@@ -44,17 +45,17 @@ class LibroFM(Retailer):
         if self.auth_token:
             headers["authorization"] = f"Bearer {self.auth_token}"
 
-        async with aiohttp.ClientSession() as http_client:
-            response = await http_client.request(
-                request_type.upper(),
-                url,
-                headers=headers,
-                **kwargs
-            )
-            if response.ok:
-                return await response.json()
-            else:
-                return {}
+        session = await self._get_session()
+        response = await session.request(
+            request_type.upper(),
+            url,
+            headers=headers,
+            **kwargs
+        )
+        if response.ok:
+            return await response.json()
+        else:
+            return {}
 
     async def set_auth(self):
         auth_path = TBR_DEALS_PATH.joinpath("libro_fm.json")
@@ -100,7 +101,7 @@ class LibroFM(Retailer):
             normalized_authors = get_normalized_authors(b["authors"])
 
             if (
-                title == b["title"]
+                title == get_normalized_title(b["title"])
                 and is_matching_authors(book.normalized_authors, normalized_authors)
             ):
                 book.audiobook_isbn = b["isbn"]

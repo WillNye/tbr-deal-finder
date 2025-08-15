@@ -9,17 +9,19 @@ import click
 
 from tbr_deal_finder import TBR_DEALS_PATH
 from tbr_deal_finder.config import Config
-from tbr_deal_finder.retailer.models import Retailer
+from tbr_deal_finder.retailer.models import AioHttpSession, Retailer
 from tbr_deal_finder.book import Book, BookFormat, get_normalized_authors, is_matching_authors
 from tbr_deal_finder.utils import currency_to_float, echo_err
 
 
-class Chirp(Retailer):
+class Chirp(AioHttpSession, Retailer):
     # Static because url for other locales just redirects to .com
     _url: str = "https://api.chirpbooks.com/api/graphql"
     USER_AGENT = "ChirpBooks/5.13.9 (Android)"
 
     def __init__(self):
+        super().__init__()
+
         self.auth_token = None
 
     @property
@@ -38,17 +40,17 @@ class Chirp(Retailer):
         if self.auth_token:
             headers["authorization"] = f"Bearer {self.auth_token}"
 
-        async with aiohttp.ClientSession() as http_client:
-            response = await http_client.request(
-                request_type.upper(),
-                self._url,
-                headers=headers,
-                **kwargs
-            )
-            if response.ok:
-                return await response.json()
-            else:
-                return {}
+        session = await self._get_session()
+        response = await session.request(
+            request_type.upper(),
+            self._url,
+            headers=headers,
+            **kwargs
+        )
+        if response.ok:
+            return await response.json()
+        else:
+            return {}
 
     async def set_auth(self):
         auth_path = TBR_DEALS_PATH.joinpath("chirp.json")
@@ -88,17 +90,17 @@ class Chirp(Retailer):
     ) -> Book:
         title = target.title
         async with semaphore:
-            async with aiohttp.ClientSession() as http_client:
-                response = await http_client.request(
-                    "POST",
-                    self._url,
-                    json={
-                        "query": "fragment audiobookFields on Audiobook{id averageRating coverUrl displayAuthors displayTitle ratingsCount url allAuthors{name slug url}} fragment audiobookWithShoppingCartAndUserAudiobookFields on Audiobook{...audiobookFields currentUserShoppingCartItem{id}currentUserWishlistItem{id}currentUserUserAudiobook{id}currentUserHasAuthorFollow{id}} fragment productFields on Product{discountPrice id isFreeListing listingPrice purchaseUrl savingsPercent showListingPrice timeLeft bannerType} query AudiobookSearch($query:String!,$promotionFilter:String,$filter:String,$page:Int,$pageSize:Int){audiobooks(query:$query,promotionFilter:$promotionFilter,filter:$filter,page:$page,pageSize:$pageSize){totalCount objects(page:$page,pageSize:$pageSize){... on Audiobook{...audiobookWithShoppingCartAndUserAudiobookFields futureSaleDate currentProduct{...productFields}}}}}",
-                        "variables": {"query": title, "filter": "all", "page": 1, "promotionFilter": "default"},
-                        "operationName": "AudiobookSearch"
-                    }
-                )
-                response_body = await response.json()
+            session = await self._get_session()
+            response = await session.request(
+                "POST",
+                self._url,
+                json={
+                    "query": "fragment audiobookFields on Audiobook{id averageRating coverUrl displayAuthors displayTitle ratingsCount url allAuthors{name slug url}} fragment audiobookWithShoppingCartAndUserAudiobookFields on Audiobook{...audiobookFields currentUserShoppingCartItem{id}currentUserWishlistItem{id}currentUserUserAudiobook{id}currentUserHasAuthorFollow{id}} fragment productFields on Product{discountPrice id isFreeListing listingPrice purchaseUrl savingsPercent showListingPrice timeLeft bannerType} query AudiobookSearch($query:String!,$promotionFilter:String,$filter:String,$page:Int,$pageSize:Int){audiobooks(query:$query,promotionFilter:$promotionFilter,filter:$filter,page:$page,pageSize:$pageSize){totalCount objects(page:$page,pageSize:$pageSize){... on Audiobook{...audiobookWithShoppingCartAndUserAudiobookFields futureSaleDate currentProduct{...productFields}}}}}",
+                    "variables": {"query": title, "filter": "all", "page": 1, "promotionFilter": "default"},
+                    "operationName": "AudiobookSearch"
+                }
+            )
+            response_body = await response.json()
 
             audiobooks = response_body["data"]["audiobooks"]["objects"]
             if not audiobooks:
