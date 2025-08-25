@@ -26,7 +26,7 @@ class Config:
     library_export_paths: list[str]
     tracked_retailers: list[str]
     max_price: float = 8.0
-    min_discount: int = 35
+    min_discount: int = 30
     run_time: datetime = datetime.now()
     
     locale: str = "us"  # This will be set as a class attribute below
