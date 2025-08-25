@@ -1,7 +1,9 @@
 import asyncio
 import copy
 import csv
+import functools
 from collections import defaultdict
+from datetime import datetime, timedelta
 from typing import Callable, Awaitable, Optional
 
 import pandas as pd
@@ -12,7 +14,7 @@ from tbr_deal_finder.owned_books import get_owned_books
 from tbr_deal_finder.retailer import Chirp, RETAILER_MAP, LibroFM, Kindle
 from tbr_deal_finder.config import Config
 from tbr_deal_finder.retailer.models import Retailer
-from tbr_deal_finder.utils import execute_query, get_duckdb_conn
+from tbr_deal_finder.utils import execute_query, get_duckdb_conn, get_query_by_name
 
 
 def _library_export_tbr_books(config: Config, tbr_book_map: dict[str: Book]):
@@ -212,6 +214,66 @@ async def _maybe_set_audiobook_isbn(config: Config, new_tbr_books: list[Book]):
         "audiobook_isbn",
         libro_fm.get_book_isbn,
     )
+
+
+@functools.cache
+def unknown_books_requires_sync() -> bool:
+    db_conn = get_duckdb_conn()
+    results = execute_query(
+        db_conn,
+        get_query_by_name("latest_unknown_book_sync.sql")
+    )
+    if not results:
+        return True
+
+    sync_last_ran = results[0]["timepoint"]
+    return datetime.now() - timedelta(days=7) > sync_last_ran
+
+
+def clear_unknown_books():
+    db_conn = get_duckdb_conn()
+    db_conn.execute(
+        "DELETE FROM unknown_book"
+    )
+    db_conn.execute(
+        "DELETE FROM unknown_book_run_history"
+    )
+
+
+def set_unknown_books(config: Config, unknown_books: list[Book]):
+    if not unknown_books_requires_sync():
+        return
+
+    db_conn = get_duckdb_conn()
+    db_conn.execute(
+        "INSERT INTO unknown_book_run_history (timepoint, ran_successfully, details) VALUES (?, ?, ?)",
+        [config.run_time, True, ""]
+    )
+
+    db_conn.execute(
+        "DELETE FROM unknown_book"
+    )
+    if not unknown_books:
+        return
+
+    df = pd.DataFrame([book.unknown_book_dict() for book in unknown_books])
+    db_conn = get_duckdb_conn()
+    db_conn.register("_df", df)
+    db_conn.execute("INSERT INTO unknown_book SELECT * FROM _df;")
+    db_conn.unregister("_df")
+
+
+def get_unknown_books(config: Config) -> list[Book]:
+    if unknown_books_requires_sync():
+        return []
+
+    db_conn = get_duckdb_conn()
+    unknown_book_data = execute_query(
+        db_conn,
+        "SELECT * EXCLUDE(book_id) FROM unknown_book"
+    )
+
+    return [Book(timepoint=config.run_time, **b) for b in unknown_book_data]
 
 
 async def _maybe_set_ebook_asin(config: Config, new_tbr_books: list[Book]):

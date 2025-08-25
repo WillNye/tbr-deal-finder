@@ -5,7 +5,7 @@ Track price drops and find deals on books in your TBR (To Be Read) and wishlist 
 ## Features
 - Use your StoryGraph exports, Goodreads exports, and custom csvs (spreadsheet) to track book deals
 - Supports multiple of the library exports above
-- Tracks deals on the wishlist of all your configured retailers like audible 
+- Tracks deals on the wishlist of all your configured retailers like audible (excluding kindle)
 - Supports multiple locales and currencies
 - Find the latest and active deals from supported sellers
 - Simple CLI interface for setup and usage

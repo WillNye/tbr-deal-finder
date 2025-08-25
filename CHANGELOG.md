@@ -3,6 +3,20 @@
 
 ---
 
+## 0.2.1 (August 25, 2025)
+
+Notes: 
+* Added Kindle Library support
+  * Wishlist support is looking unlikely
+    * Running into auth issues on the only viable endpoint https://www.amazon.com/kindle-reader-api 
+* No longer attempting to retrieve details on books not previously found on every run
+  * Full check is now performed weekly or when a change has been made to the user config
+
+BUG FIXES:
+* Failed Libro login no longer causing crash
+
+---
+
 ## 0.2.0 (August 15, 2025)
 
 Notes: 
@@ -16,6 +30,7 @@ Notes:
 
 BUG FIXES:
 * Fixed breaking import on Windows systems
+* Fixed displayed discount percent
 
 ---
 

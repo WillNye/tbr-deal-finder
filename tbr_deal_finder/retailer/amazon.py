@@ -15,7 +15,7 @@ from tbr_deal_finder import TBR_DEALS_PATH
 from tbr_deal_finder.config import Config
 from tbr_deal_finder.retailer.models import Retailer
 
-_AUTH_PATH = TBR_DEALS_PATH.joinpath("audible.json")
+AUTH_PATH = TBR_DEALS_PATH.joinpath("audible.json")
 
 
 def login_url_callback(url: str) -> str:
@@ -71,15 +71,15 @@ class Amazon(Retailer):
     _client: audible.AsyncClient = None
 
     async def set_auth(self):
-        if not os.path.exists(_AUTH_PATH):
+        if not os.path.exists(AUTH_PATH):
             auth = audible.Authenticator.from_login_external(
                 locale=Config.locale,
                 login_url_callback=login_url_callback
             )
 
             # Save credentials to file
-            auth.to_file(_AUTH_PATH)
+            auth.to_file(AUTH_PATH)
 
-        self._auth = audible.Authenticator.from_file(_AUTH_PATH)
+        self._auth = audible.Authenticator.from_file(AUTH_PATH)
         self._client = audible.AsyncClient(auth=self._auth)
 

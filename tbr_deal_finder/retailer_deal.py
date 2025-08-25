@@ -8,7 +8,7 @@ from tqdm.asyncio import tqdm_asyncio
 
 from tbr_deal_finder.book import Book, get_active_deals, BookFormat
 from tbr_deal_finder.config import Config
-from tbr_deal_finder.tracked_books import get_tbr_books
+from tbr_deal_finder.tracked_books import get_tbr_books, get_unknown_books, set_unknown_books
 from tbr_deal_finder.retailer import RETAILER_MAP
 from tbr_deal_finder.retailer.models import Retailer
 from tbr_deal_finder.utils import get_duckdb_conn, echo_warning, echo_info
@@ -55,7 +55,12 @@ def update_retailer_deal_table(config: Config, new_deals: list[Book]):
         db_conn.unregister("_df")
 
 
-async def _get_books(config, retailer: Retailer, books: list[Book]) -> list[Book]:
+async def _get_books(
+    config, 
+    retailer: Retailer, 
+    books: list[Book],
+    ignored_deal_ids: set[str],
+) -> tuple[list[Book], list[Book]]:
     """Get Books with limited concurrency.
 
     - Creates semaphore to limit concurrent requests.
@@ -72,7 +77,7 @@ async def _get_books(config, retailer: Retailer, books: list[Book]) -> list[Book
     """
     semaphore = asyncio.Semaphore(10)
     response = []
-    unresolved_books = []
+    unknown_books = []
     books = [copy.deepcopy(book) for book in books]
     for book in books:
         book.retailer = retailer.name
@@ -81,19 +86,20 @@ async def _get_books(config, retailer: Retailer, books: list[Book]) -> list[Book
     tasks = [
         retailer.get_book(book, semaphore)
         for book in books
+        if book.deal_id not in ignored_deal_ids
     ]
     results = await tqdm_asyncio.gather(*tasks, desc=f"Getting latest prices from {retailer.name}")
     for book in results:
         if book.exists:
             response.append(book)
         elif not book.exists:
-            unresolved_books.append(book)
+            unknown_books.append(book)
 
     click.echo()
-    for book in unresolved_books:
+    for book in unknown_books:
         echo_info(f"{book.title} by {book.authors} not found")
 
-    return response
+    return response, unknown_books
 
 
 def _apply_proper_list_prices(books: list[Book]):
@@ -169,7 +175,10 @@ async def get_latest_deals(config: Config):
     """
 
     books: list[Book] = []
+    unknown_books: list[Book] = []
     tbr_books = await get_tbr_books(config)
+    ignore_books: list[Book] = get_unknown_books(config)
+    ignored_deal_ids: set[str] = {book.deal_id for book in ignore_books}
 
     for retailer_str in config.tracked_retailers:
         retailer = RETAILER_MAP[retailer_str]()
@@ -182,7 +191,14 @@ async def get_latest_deals(config: Config):
 
         echo_info(f"Getting deals from {retailer.name}")
         click.echo("\n---------------")
-        books.extend(await _get_books(config, retailer, relevant_tbr_books))
+        retailer_books, u_books = await _get_books(
+            config,
+            retailer,
+            relevant_tbr_books,
+            ignored_deal_ids
+        )
+        books.extend(retailer_books)
+        unknown_books.extend(u_books)
         click.echo("---------------\n")
 
     _apply_proper_list_prices(books)
@@ -194,3 +210,4 @@ async def get_latest_deals(config: Config):
     ]
 
     update_retailer_deal_table(config, books)
+    set_unknown_books(config, unknown_books)

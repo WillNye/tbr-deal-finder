@@ -1,12 +1,16 @@
 import asyncio
+import json
 import readline  # type: ignore
 
 from tbr_deal_finder.config import Config
-from tbr_deal_finder.retailer.amazon import Amazon
+from tbr_deal_finder.retailer.amazon import Amazon, AUTH_PATH
 from tbr_deal_finder.book import Book, BookFormat, get_normalized_title, get_normalized_authors, is_matching_authors
 
 
 class Kindle(Amazon):
+
+    def __init__(self):
+        self._headers = {}
 
     @property
     def name(self) -> str:
@@ -18,6 +22,25 @@ class Kindle(Amazon):
 
     def _get_base_url(self) -> str:
         return f"https://www.amazon.{self._auth.locale.domain}"
+
+    def _get_read_base_url(self) -> str:
+        return f"https://read.amazon.{self._auth.locale.domain}"
+
+    async def set_auth(self):
+        await super().set_auth()
+
+        with open(AUTH_PATH, "r") as f:
+            auth_info = json.load(f)
+
+            cookies = auth_info["website_cookies"]
+            cookies["x-access-token"] = auth_info["access_token"]
+
+        self._headers = {
+            "User-Agent": "Mozilla/5.0 (Linux; Android 10; Kindle) AppleWebKit/537.3",
+            "Accept": "application/json, */*",
+            "Cookie": "; ".join([f"{k}={v}" for k, v in cookies.items()])
+        }
+
 
     async def get_book_asin(
         self,
@@ -90,44 +113,28 @@ class Kindle(Amazon):
         return []
 
     async def get_library(self, config: Config) -> list[Book]:
-        """Not currently supported
-
-        Getting this info is proving to be a nightmare
-
-        :param config:
-        :return:
-        """
-        return []
-
-    async def _get_library_attempt(self, config: Config) -> list[Book]:
-        """This should work, but it's returning a redirect
-
-        The user is already authenticated at this point, so I'm not sure what's happening
-        """
-        response = []
+        books = []
         pagination_token = 0
-        total_pages = 1
+        url = f"{self._get_read_base_url()}/kindle-library/search"
 
-        while pagination_token < total_pages:
+        while True:
             optional_params = {}
             if pagination_token:
                 optional_params["paginationToken"] = pagination_token
 
             response = await self._client.get(
-                "https://read.amazon.com/kindle-library/search",
+                url,
+                headers=self._headers,
                 query="",
                 libraryType="BOOKS",
                 sortType="recency",
                 resourceType="EBOOK",
-                querySize=5,
+                querySize=50,
                 **optional_params
             )
 
-            if "paginationToken" in response:
-                total_pages = int(response["paginationToken"])
-
             for book in response["itemsList"]:
-                response.append(
+                books.append(
                     Book(
                         retailer=self.name,
                         title = book["title"],
@@ -138,4 +145,9 @@ class Kindle(Amazon):
                     )
                 )
 
-        return response
+            if "paginationToken" in response:
+                pagination_token = int(response["paginationToken"])
+            else:
+                break
+
+        return books
