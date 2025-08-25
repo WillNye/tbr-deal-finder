@@ -10,7 +10,7 @@ from tbr_deal_finder import TBR_DEALS_PATH
 from tbr_deal_finder.config import Config
 from tbr_deal_finder.retailer.models import AioHttpSession, Retailer
 from tbr_deal_finder.book import Book, BookFormat, get_normalized_authors, is_matching_authors, get_normalized_title
-from tbr_deal_finder.utils import currency_to_float
+from tbr_deal_finder.utils import currency_to_float, echo_err
 
 
 class LibroFM(AioHttpSession, Retailer):
@@ -77,6 +77,10 @@ class LibroFM(AioHttpSession, Retailer):
                 "password": click.prompt("Libro FM Password", hide_input=True),
             }
         )
+        if "access_token" not in response:
+            echo_err("Login failed. Try again.")
+            await self.set_auth()
+
         self.auth_token = response["access_token"]
         with open(auth_path, "w") as f:
             json.dump(response, f)
