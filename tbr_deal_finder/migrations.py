@@ -62,6 +62,32 @@ _MIGRATIONS = [
             );
             """
     ),
+    TableMigration(
+        version=1,
+        table_name="unknown_book",
+        sql="""
+            CREATE TABLE unknown_book
+            (
+                retailer        VARCHAR,
+                title           VARCHAR,
+                authors         VARCHAR,
+                format          VARCHAR,
+                book_id         VARCHAR
+            );
+            """
+    ),
+    TableMigration(
+        version=1,
+        table_name="unknown_book_run_history",
+        sql="""
+            CREATE TABLE unknown_book_run_history
+            (
+                timepoint           TIMESTAMP_NS,
+                ran_successfully    BOOLEAN,
+                details             VARCHAR
+            );
+            """
+    ),
 ]
 
 

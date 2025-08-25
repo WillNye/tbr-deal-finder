@@ -55,7 +55,10 @@ class Book:
         self.format = format
 
     def discount(self) -> int:
-        return int((self.list_price/self.current_price - 1) * 100)
+        if not self.current_price:
+            return 100
+
+        return int((1 - self.current_price/self.list_price) * 100)
 
     @staticmethod
     def price_to_string(price: float) -> str:
@@ -125,6 +128,15 @@ class Book:
             "audiobook_isbn": self.audiobook_isbn,
             "audiobook_list_price": self.audiobook_list_price,
             "book_id": self.title_id,
+        }
+
+    def unknown_book_dict(self):
+        return {
+            "retailer": self.retailer,
+            "title": self.title,
+            "authors": self.authors,
+            "format": self.format.value,
+            "book_id": self.deal_id,
         }
 
 

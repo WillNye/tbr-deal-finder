@@ -13,7 +13,7 @@ from tbr_deal_finder.migrations import make_migrations
 from tbr_deal_finder.book import get_deals_found_at, print_books, get_active_deals
 from tbr_deal_finder.retailer import RETAILER_MAP
 from tbr_deal_finder.retailer_deal import get_latest_deals
-from tbr_deal_finder.tracked_books import reprocess_incomplete_tbr_books
+from tbr_deal_finder.tracked_books import reprocess_incomplete_tbr_books, clear_unknown_books
 from tbr_deal_finder.utils import (
     echo_err,
     echo_info,
@@ -183,6 +183,7 @@ def setup():
     # Retailers may have changed causing some books to need reprocessing
     config = Config.load()
     reprocess_incomplete_tbr_books(config)
+    clear_unknown_books()
 
 
 @cli.command()
