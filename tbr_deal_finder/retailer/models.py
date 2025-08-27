@@ -1,7 +1,7 @@
 import abc
 import asyncio
 import dataclasses
-from typing import Optional
+from typing import Optional, Union
 
 import aiohttp
 
@@ -41,6 +41,11 @@ class Retailer(abc.ABC):
     def gui_auth_context(self) -> GuiAuthContext:
         raise NotImplementedError
 
+    @property
+    def max_concurrency(self) -> int:
+        # The max number of simultaneous requests to send to this retailer
+        return 10
+
     async def set_auth(self):
         raise NotImplementedError
 
@@ -49,7 +54,7 @@ class Retailer(abc.ABC):
 
     async def get_book(
             self, target: Book, semaphore: asyncio.Semaphore
-    ) -> Book:
+    ) -> Union[Book, None]:
         """Get book information from the retailer.
 
         - Uses Audible's product API to fetch book details

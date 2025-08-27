@@ -3,6 +3,7 @@ import json
 import os
 from datetime import datetime, timedelta
 from textwrap import dedent
+from typing import Union
 
 import aiohttp
 import click
@@ -136,7 +137,7 @@ class Chirp(AioHttpSession, Retailer):
 
     async def get_book(
         self, target: Book, semaphore: asyncio.Semaphore
-    ) -> Book:
+    ) -> Union[Book, None]:
         title = target.title
         async with semaphore:
             session = await self._get_session()

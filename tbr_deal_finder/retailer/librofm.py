@@ -3,6 +3,7 @@ import json
 import os
 import urllib.parse
 from datetime import datetime, timedelta
+from typing import Union
 
 import click
 
@@ -152,24 +153,24 @@ class LibroFM(AioHttpSession, Retailer):
 
     async def get_book(
         self, target: Book, semaphore: asyncio.Semaphore
-    ) -> Book:
+    ) -> Union[Book, None]:
         if not target.audiobook_isbn:
             target.exists = False
             return target
 
         async with semaphore:
-            response = await self.make_request(
-                f"api/v10/explore/audiobook_details/{target.audiobook_isbn}",
-                "GET"
-            )
+            for _ in range(10):
+                response = await self.make_request(
+                    f"api/v10/explore/audiobook_details/{target.audiobook_isbn}",
+                    "GET"
+                )
 
-        if response:
-            target.list_price = target.audiobook_list_price
-            target.current_price = currency_to_float(response["data"]["purchase_info"]["price"])
-            return target
+                if response:
+                    target.list_price = target.audiobook_list_price
+                    target.current_price = currency_to_float(response["data"]["purchase_info"]["price"])
+                    return target
 
-        target.exists = False
-        return target
+        return None
 
     async def get_wishlist(self, config: Config) -> list[Book]:
         wishlist_books = []

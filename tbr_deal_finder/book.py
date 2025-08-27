@@ -190,10 +190,12 @@ def print_books(config: Config, books: list[Book]):
 
 
 def get_full_title_str(title: str, authors: Union[list, str]) -> str:
+    title = get_normalized_title(title)
     return f"{title}__{get_normalized_authors(authors)}"
 
 
 def get_title_id(title: str, authors: Union[list, str], book_format: BookFormat) -> str:
+    title = get_normalized_title(title)
     return f"{title}__{get_normalized_authors(authors)}__{book_format.value}"
 
 
