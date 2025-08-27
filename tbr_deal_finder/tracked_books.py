@@ -241,20 +241,22 @@ def clear_unknown_books():
 
 
 def set_unknown_books(config: Config, unknown_books: list[Book]):
-    if not unknown_books_requires_sync():
+    if (not unknown_books_requires_sync()) and (not unknown_books):
         return
 
     db_conn = get_duckdb_conn()
-    db_conn.execute(
-        "INSERT INTO unknown_book_run_history (timepoint, ran_successfully, details) VALUES (?, ?, ?)",
-        [config.run_time, True, ""]
-    )
 
-    db_conn.execute(
-        "DELETE FROM unknown_book"
-    )
-    if not unknown_books:
-        return
+    if unknown_books_requires_sync():
+        db_conn.execute(
+            "INSERT INTO unknown_book_run_history (timepoint, ran_successfully, details) VALUES (?, ?, ?)",
+            [config.run_time, True, ""]
+        )
+
+        db_conn.execute(
+            "DELETE FROM unknown_book"
+        )
+        if not unknown_books:
+            return
 
     df = pd.DataFrame([book.unknown_book_dict() for book in unknown_books])
     db_conn = get_duckdb_conn()

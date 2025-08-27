@@ -1,3 +1,5 @@
+import functools
+import os
 import re
 from typing import Optional
 
@@ -5,6 +7,11 @@ import click
 import duckdb
 
 from tbr_deal_finder import TBR_DEALS_PATH, QUERY_PATH
+
+
+@functools.cache
+def is_gui_env() -> bool:
+    return os.environ.get("ENTRYPOINT", "GUI") == "GUI"
 
 
 def currency_to_float(price_str):
