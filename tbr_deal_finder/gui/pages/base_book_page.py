@@ -8,7 +8,7 @@ from tbr_deal_finder.book import Book, BookFormat
 class BaseBookPage(ABC):
     """Base class for pages that display lists of books with pagination, search, and filtering."""
     
-    def __init__(self, app, items_per_page: int = 20):
+    def __init__(self, app, items_per_page: int):
         self.app = app
         self.items = []
         self.filtered_items = []
@@ -55,7 +55,12 @@ class BaseBookPage(ABC):
         self.loading_container = ft.Container(
             content=ft.Column([
                 ft.ProgressRing(),
-                ft.Text("Loading...", text_align=ft.TextAlign.CENTER)
+                ft.Text("Loading...", text_align=ft.TextAlign.CENTER),
+                ft.Text(
+                    "This may take a moment if you've recently made changes to your wishlist, exports, or this is your first time.",
+                    text_align=ft.TextAlign.CENTER,
+                    size=11
+                )
             ], spacing=10, horizontal_alignment=ft.CrossAxisAlignment.CENTER),
             visible=self.is_loading,
             alignment=ft.alignment.center,
@@ -137,7 +142,7 @@ class BaseBookPage(ABC):
         
         return ft.Container(
             content=ft.ListView(item_tiles, spacing=5),
-            height=500,
+            height=700,
             border=ft.border.all(1, ft.Colors.OUTLINE),
             border_radius=8,
             padding=10

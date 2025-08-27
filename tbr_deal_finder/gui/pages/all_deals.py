@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 class AllDealsPage(BaseBookPage):
     def __init__(self, app):
-        super().__init__(app, items_per_page=20)
+        super().__init__(app, items_per_page=6)
         
     def get_page_title(self) -> str:
         return "All Active Deals"

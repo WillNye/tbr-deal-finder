@@ -3,6 +3,20 @@
 
 ---
 
+## 0.3.0 (August X, 2025)
+
+Notes: 
+* Added a GUI to serve as a desktop app
+* Added retry behavior to Kindle and Libro on get_book call
+* Saving all pricing info to be used for historical pricing details
+
+BUG FIXES:
+* Improvements to grouping titles in TBR 
+* Fixed issue where known books were being marked as unknown if not found on a run
+* Fixed bug where books not found were sometimes not added to Unknown books 
+
+---
+
 ## 0.2.1 (August 25, 2025)
 
 Notes: 

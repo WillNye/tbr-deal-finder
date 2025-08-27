@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 class AllBooksPage(BaseBookPage):
     def __init__(self, app):
-        super().__init__(app, items_per_page=25)
+        super().__init__(app, items_per_page=7)
         
     def get_page_title(self) -> str:
         return "My Books"

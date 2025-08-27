@@ -11,7 +11,7 @@ from .base_book_page import BaseBookPage
 
 class LatestDealsPage(BaseBookPage):
     def __init__(self, app):
-        super().__init__(app, items_per_page=20)
+        super().__init__(app, 25)
         self.last_run_time = None
         
     def get_page_title(self) -> str:
