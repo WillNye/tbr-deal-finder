@@ -159,7 +159,11 @@ def get_active_deals() -> list[Book]:
     return [Book(**book) for book in query_response]
 
 
-def print_books(books: list[Book]):
+def is_qualifying_deal(config: Config, book: Book) -> bool:
+    return book.current_price <= config.max_price and book.discount() >= config.min_discount
+
+
+def print_books(config: Config, books: list[Book]):
     audiobooks = [book for book in books if book.format == BookFormat.AUDIOBOOK]
     audiobooks = sorted(audiobooks, key=lambda book: book.deal_id)
 
@@ -171,6 +175,9 @@ def print_books(books: list[Book]):
             continue
 
         init_book = books_in_format[0]
+        if not is_qualifying_deal(config, init_book):
+            continue
+
         echo_info(f"\n\n{init_book.format.value} Deals:")
 
         prior_title_id = init_book.title_id

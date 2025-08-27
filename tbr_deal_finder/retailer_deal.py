@@ -206,7 +206,6 @@ async def get_latest_deals(config: Config):
     books = [
         book
         for book in books
-        if book.current_price <= config.max_price and book.discount() >= config.min_discount
     ]
 
     update_retailer_deal_table(config, books)

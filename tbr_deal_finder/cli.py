@@ -231,7 +231,7 @@ def latest_deals():
         config.run_time = last_ran
 
     if books := get_deals_found_at(config.run_time):
-        print_books(books)
+        print_books(config, books)
     else:
         echo_info("No new deals found.")
 
@@ -239,8 +239,13 @@ def latest_deals():
 @cli.command()
 def active_deals():
     """Get all active deals."""
+    try:
+        config = Config.load()
+    except FileNotFoundError:
+        config = _set_config()
+
     if books := get_active_deals():
-        print_books(books)
+        print_books(config, books)
     else:
         echo_info("No deals found.")
 
