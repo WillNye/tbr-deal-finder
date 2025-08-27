@@ -1,10 +1,21 @@
 import abc
 import asyncio
+import dataclasses
+from typing import Optional
 
 import aiohttp
 
 from tbr_deal_finder.book import Book, BookFormat
 from tbr_deal_finder.config import Config
+
+
+@dataclasses.dataclass
+class GuiAuthContext:
+    title: str
+    fields: list[dict]
+    message: Optional[str] = None
+    user_copy_context: Optional[str] = None
+    pop_up_type: Optional[str] = "form"
 
 
 class Retailer(abc.ABC):
@@ -26,7 +37,14 @@ class Retailer(abc.ABC):
         """
         raise NotImplementedError
 
+    @property
+    def gui_auth_context(self) -> GuiAuthContext:
+        raise NotImplementedError
+
     async def set_auth(self):
+        raise NotImplementedError
+
+    async def gui_auth(self, form_data: dict) -> bool:
         raise NotImplementedError
 
     async def get_book(
