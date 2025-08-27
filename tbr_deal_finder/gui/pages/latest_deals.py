@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from typing import List
 
 from tbr_deal_finder.book import get_deals_found_at, Book, BookFormat, is_qualifying_deal
-from tbr_deal_finder.utils import get_duckdb_conn, execute_query, get_query_by_name
+from tbr_deal_finder.utils import get_duckdb_conn, get_latest_deal_last_ran
 from .base_book_page import BaseBookPage
 
 
@@ -223,19 +223,8 @@ class LatestDealsPage(BaseBookPage):
 
     def check_last_run(self):
         """Check when deals were last run"""
-        try:
-            db_conn = get_duckdb_conn()
-            results = execute_query(
-                db_conn,
-                get_query_by_name("get_active_deals.sql")
-            )
-            if results:
-                self.last_run_time = results[0]["timepoint"]
-            else:
-                self.last_run_time = None
-        except Exception as e:
-            print(f"Error checking last run: {e}")
-            self.last_run_time = None
+        db_conn = get_duckdb_conn()
+        self.last_run_time = get_latest_deal_last_ran(db_conn)
 
     def can_run_latest_deals(self) -> bool:
         """Check if latest deals can be run (8 hour cooldown)"""

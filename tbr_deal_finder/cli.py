@@ -18,9 +18,8 @@ from tbr_deal_finder.utils import (
     echo_err,
     echo_info,
     echo_success,
-    execute_query,
     get_duckdb_conn,
-    get_query_by_name
+    get_latest_deal_last_ran
 )
 
 
@@ -195,34 +194,13 @@ def latest_deals():
         config = _set_config()
 
     db_conn = get_duckdb_conn()
-    results = execute_query(
-        db_conn,
-        get_query_by_name("get_active_deals.sql")
-    )
-    last_ran = None if not results else results[0]["timepoint"]
+    last_ran = get_latest_deal_last_ran(db_conn)
     min_age = config.run_time - timedelta(hours=8)
 
     if not last_ran or last_ran < min_age:
-        try:
-            asyncio.run(get_latest_deals(config))
-        except Exception as e:
-            ran_successfully = False
-            details = f"Error getting deals: {e}"
-            echo_err(details)
-        else:
-            ran_successfully = True
-            details = ""
-
-        # Save execution results
-        db_conn.execute(
-            "INSERT INTO latest_deal_run_history (timepoint, ran_successfully, details) VALUES (?, ?, ?)",
-            [config.run_time, ran_successfully, details]
-        )
-
+        ran_successfully = asyncio.run(get_latest_deals(config))
         if not ran_successfully:
-            # Gracefully exit on Exception raised by get_latest_deals
             return
-
     else:
         echo_info(dedent("""
         To prevent abuse lastest deals can only be pulled every 8 hours.

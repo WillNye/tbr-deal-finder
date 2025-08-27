@@ -222,8 +222,7 @@ class TBRDealFinderApp:
             # First authenticate all retailers using GUI dialogs
             await self.auth_all_configured_retailers()
             # Then fetch the deals (retailers should already be authenticated)
-            await get_latest_deals(self.config)
-            return True
+            return await get_latest_deals(self.config)
         except Exception as e:
             print(f"Error getting latest deals: {e}")
             return False
