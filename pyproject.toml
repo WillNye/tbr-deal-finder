@@ -10,8 +10,10 @@ dependencies = [
     "audible==0.8.2",
     "click>=8.2.1",
     "duckdb>=1.3.2",
+    "flet[all]==0.28.2",
     "levenshtein>=0.27.1",
     "pandas>=2.3.1",
+    "plotly>=5.17.0",
     "questionary>=2.1.0",
     "tqdm>=4.67.1",
     "unidecode>=1.4.0",
@@ -19,12 +21,15 @@ dependencies = [
 
 [project.scripts]
 tbr-deal-finder = "tbr_deal_finder.cli:cli"
+tbr-deal-finder-gui = "tbr_deal_finder.gui.main:main"
+
 
 [tool.setuptools.package-data]
 "tbr-deal-finder" = [
     "queries/**/*.sql",
     "reports/*.j2",
-    "data/*.json"
+    "data/*.json",
+    "tbr_deal_finder/gui/assets/*"
 ]
 
 [build-system]
