@@ -8,6 +8,7 @@ import click
 import duckdb
 
 from tbr_deal_finder import TBR_DEALS_PATH, QUERY_PATH
+from tbr_deal_finder.config import Config
 
 
 @functools.cache
@@ -27,6 +28,10 @@ def currency_to_float(price_str):
         return float(cleaned) if cleaned else 0.0
     except ValueError:
         return 0.0
+
+
+def float_to_currency(val: float) -> str:
+    return f"{Config.currency_symbol()}{val:.2f}"
 
 
 def get_duckdb_conn():

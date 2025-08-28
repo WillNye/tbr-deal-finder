@@ -38,14 +38,6 @@ def update_retailer_deal_table(config: Config, new_deals: list[Book]):
         else:
             df_data.append(deal.dict())
 
-    # Any remaining values in active_deal_map mean that
-    # it wasn't found and should be marked for deletion
-    for deal in active_deal_map.values():
-        echo_warning(f"{str(deal)} is no longer active\n")
-        deal.timepoint = config.run_time
-        deal.deleted = True
-        df_data.append(deal.dict())
-
     if df_data:
         df = pd.DataFrame(df_data)
 

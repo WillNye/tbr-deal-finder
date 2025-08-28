@@ -1,15 +1,153 @@
 import logging
 
 import flet as ft
-import plotly.graph_objects as go
-import plotly.express as px
 from datetime import datetime, timedelta
-from typing import List, Dict
+from typing import List
 
 from tbr_deal_finder.book import Book, BookFormat
-from tbr_deal_finder.utils import get_duckdb_conn, execute_query
+from tbr_deal_finder.utils import get_duckdb_conn, execute_query, float_to_currency
 
 logger = logging.getLogger(__name__)
+
+
+def build_book_price_section(historical_data: list[dict]) -> ft.Column:
+    retailer_data = dict()
+    available_colors = [
+        ft.Colors.AMBER,
+        ft.Colors.INDIGO,
+        ft.Colors.CYAN,
+        ft.Colors.ORANGE,
+        ft.Colors.RED,
+        ft.Colors.GREEN,
+        ft.Colors.YELLOW,
+        ft.Colors.BLUE,
+    ]
+
+    min_price = None
+    max_price = None
+    min_time = None
+    max_time = None
+
+    for record in historical_data:
+        if record["retailer"] not in retailer_data:
+            retailer_data[record["retailer"]] = dict()
+            retailer_data[record["retailer"]]["color"] = available_colors.pop(0)
+            retailer_data[record["retailer"]]["data"] = []
+
+        # Convert datetime to timestamp for x-axis
+        timestamp = record["timepoint"].timestamp()
+        tooltip = f"{record['retailer']}: {float_to_currency(record['current_price'])}"
+
+        retailer_data[record["retailer"]]["data"].append(
+            ft.LineChartDataPoint(timestamp, record["current_price"], tooltip=tooltip)
+        )
+
+        # Track price range
+        if not min_price or record["current_price"] < min_price:
+            min_price = record["current_price"]
+        if not max_price or record["list_price"] > max_price:
+            max_price = record["list_price"]
+
+        # Track time range
+        if not min_time or timestamp < min_time:
+            min_time = timestamp
+        if not max_time or timestamp > max_time:
+            max_time = timestamp
+
+    # Y-axis setup
+    y_min = min_price // 5 * 5  # Keep as float
+    y_max = ((max_price + 4) // 5) * 5  # Round up to nearest 5
+    y_axis_labels = []
+    for val in range(int(y_min), int(y_max) + 1, 5):
+        y_axis_labels.append(
+            ft.ChartAxisLabel(
+                value=val,
+                label=ft.Text(float_to_currency(val), no_wrap=True)
+            )
+        )
+
+    # X-axis setup - create labels for actual data points
+    x_axis_labels = []
+
+    # Get unique months from the data
+    unique_months = set()
+    for record in historical_data:
+        month_year = record["timepoint"].strftime('%B %Y')
+        unique_months.add((record["timepoint"].timestamp(), month_year))
+
+    # Sort by timestamp and create labels
+    for timestamp, month_year in sorted(unique_months):
+        date_str = month_year.split()[0]  # Just show month abbreviation
+        x_axis_labels.append(
+            ft.ChartAxisLabel(
+                value=timestamp,
+                label=ft.Container(
+                    content=ft.Text(date_str),
+                    padding=ft.padding.only(left=20)  # Add top padding
+                )
+            )
+        )
+
+    # Create the chart
+    chart = ft.LineChart(
+        data_series=[
+            ft.LineChartData(
+                data_points=retailer["data"],
+                stroke_width=3,
+                color=retailer["color"],
+                curved=True,
+                stroke_cap_round=True,
+            )
+            for retailer in retailer_data.values()
+        ],
+        border=ft.border.all(1, ft.Colors.with_opacity(0.2, ft.Colors.ON_SURFACE)),
+        horizontal_grid_lines=ft.ChartGridLines(
+            interval=5,
+            color=ft.Colors.with_opacity(0.2, ft.Colors.ON_SURFACE),
+            width=1,
+        ),
+        vertical_grid_lines=ft.ChartGridLines(
+            interval=604800,  # 1 week
+            color=ft.Colors.with_opacity(0.2, ft.Colors.ON_SURFACE),
+            width=1,
+        ),
+        left_axis=ft.ChartAxis(labels=y_axis_labels, labels_size=50),
+        bottom_axis=ft.ChartAxis(labels=x_axis_labels),
+        expand=False,
+        height=200,
+        width=850,
+        min_x=min_time,
+        max_x=max_time,
+        min_y=y_min,
+        max_y=y_max,
+        interactive=True,
+    )
+
+    # Legend
+    row_data = []
+    for retailer_name, retailer in retailer_data.items():
+        row_data.append(
+            ft.Row([
+                ft.Container(width=20, height=3, bgcolor=retailer["color"]),
+                ft.Text(retailer_name),
+            ], spacing=5),
+        )
+    legend = ft.Row(row_data, spacing=20)
+
+    return ft.Column(
+        [
+            ft.Container(
+                content=chart,
+                padding=25,
+            ),
+            ft.Container(
+                content=legend,
+                alignment=ft.alignment.center,
+            ),
+        ],
+        spacing=0
+    )
+
 
 class BookDetailsPage:
     def __init__(self, app):
@@ -280,18 +418,15 @@ class BookDetailsPage:
             )
         
         # Create the chart
-        chart_html = self.create_pricing_chart()
+        chart_fig = build_book_price_section(self.historical_data)
         
         return ft.Container(
             content=ft.Column([
                 ft.Text("Historical Pricing", size=20, weight=ft.FontWeight.BOLD),
-                ft.Text("Price trends over the last 90 days", color=ft.Colors.GREY_600),
+                ft.Text("Price trends over the last 3 months", color=ft.Colors.GREY_600),
                 ft.Container(
-                    content=ft.Text("Chart would be displayed here (HTML/Plotly integration needed)", 
-                                   color=ft.Colors.GREY_500),
+                    content=chart_fig,
                     height=300,
-                    border=ft.border.all(1, ft.Colors.GREY_300),
-                    border_radius=8,
                     alignment=ft.alignment.center
                 )
                 # Note: Flet has limited Plotly integration. In a real implementation,
@@ -382,10 +517,10 @@ class BookDetailsPage:
         cutoff_date = datetime.now() - timedelta(days=90)
         
         query = """
-        SELECT retailer, current_price, timepoint
+        SELECT retailer, list_price, current_price, timepoint
         FROM retailer_deal
         WHERE title = ? AND authors = ? AND format = ? 
-        AND timepoint >= ? AND deleted IS NOT TRUE
+        AND timepoint >= ?
         ORDER BY timepoint ASC
         """
         
@@ -396,44 +531,6 @@ class BookDetailsPage:
         )
         
         self.historical_data = results
-
-    def create_pricing_chart(self):
-        """Create a Plotly chart for historical pricing"""
-        if not self.historical_data:
-            return ""
-        
-        # Group data by retailer
-        retailer_data = {}
-        for row in self.historical_data:
-            retailer = row['retailer']
-            if retailer not in retailer_data:
-                retailer_data[retailer] = {'dates': [], 'prices': []}
-            retailer_data[retailer]['dates'].append(row['timepoint'])
-            retailer_data[retailer]['prices'].append(row['current_price'])
-        
-        # Create Plotly figure
-        fig = go.Figure()
-        
-        colors = px.colors.qualitative.Set1
-        for i, (retailer, data) in enumerate(retailer_data.items()):
-            fig.add_trace(go.Scatter(
-                x=data['dates'],
-                y=data['prices'],
-                mode='lines+markers',
-                name=retailer,
-                line=dict(color=colors[i % len(colors)])
-            ))
-        
-        fig.update_layout(
-            title=f"Price History - {self.book.title} ({self.selected_format.value})",
-            xaxis_title="Date",
-            yaxis_title="Price ($)",
-            hovermode='x unified',
-            height=300
-        )
-        
-        # Convert to HTML (this would need to be integrated with Flet's plotting capabilities)
-        return fig.to_html()
 
     def refresh_data(self):
         """Refresh book data"""
