@@ -223,17 +223,17 @@ class LatestDealsPage(BaseBookPage):
 
     def check_last_run(self):
         """Check when deals were last run"""
-        db_conn = get_duckdb_conn()
-        self.last_run_time = get_latest_deal_last_ran(db_conn)
+        if not self.last_run_time:
+            db_conn = get_duckdb_conn()
+            self.last_run_time = get_latest_deal_last_ran(db_conn)
 
     def can_run_latest_deals(self) -> bool:
         """Check if latest deals can be run (8 hour cooldown)"""
         if not self.last_run_time:
             return True
         
-        # min_age = datetime.now() - timedelta(hours=8)
-        # return self.last_run_time < min_age
-        return True
+        min_age = datetime.now() - timedelta(hours=8)
+        return self.last_run_time < min_age
 
     def run_latest_deals(self, e):
         """Run the latest deals check"""
@@ -286,12 +286,10 @@ class LatestDealsPage(BaseBookPage):
             self.progress_container.visible = False
             self.run_button.disabled = False
             self.check_last_run()  # Refresh the status
-            self.update_items_display()
-            # Need to update the whole page for the header status change
-            if hasattr(self.app, 'page'):
-                self.app.page.update()
-            # Properly cleanup the event loop
-            self._cleanup_event_loop(loop)
+            # Refresh all pages since latest deals affects data on other pages
+            self.app.refresh_all_pages()
+            # Force a full page rebuild to update header status and content
+            self.app.update_content()
     
     def _cleanup_event_loop(self, loop):
         """Properly cleanup the event loop and any pending tasks"""
@@ -352,3 +350,22 @@ class LatestDealsPage(BaseBookPage):
         """Close dialog"""
         dialog.open = False
         self.app.page.update()
+    
+    def refresh_page_state(self):
+        """Override base refresh to handle latest deals specific state"""
+        # Reset state
+        self.items = []
+        self.filtered_items = []
+        self.current_page = 0
+        self.search_query = ""
+        self.format_filter = "All"
+        
+        # Reset UI elements if they exist
+        if hasattr(self, 'search_field'):
+            self.search_field.value = ""
+        if hasattr(self, 'format_dropdown'):
+            self.format_dropdown.value = "All"
+        
+        # Check last run and reload data
+        self.check_last_run()
+        self.load_items()

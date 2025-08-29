@@ -270,3 +270,21 @@ class BaseBookPage(ABC):
         if hasattr(self, 'loading_container'):
             self.loading_container.visible = loading
         self.update_items_display()
+    
+    def refresh_page_state(self):
+        """Clear page state and reload data. Called when navigating to this page."""
+        # Reset state
+        self.items = []
+        self.filtered_items = []
+        self.current_page = 0
+        self.search_query = ""
+        self.format_filter = "All"
+        
+        # Reset UI elements if they exist
+        if hasattr(self, 'search_field'):
+            self.search_field.value = ""
+        if hasattr(self, 'format_dropdown'):
+            self.format_dropdown.value = "All"
+        
+        # Reload data
+        self.load_items()

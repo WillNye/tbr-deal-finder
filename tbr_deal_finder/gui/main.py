@@ -126,12 +126,33 @@ class TBRDealFinderApp:
         destinations = ["all_deals", "latest_deals", "all_books"]
         if e.control.selected_index < len(destinations):
             self.current_page = destinations[e.control.selected_index]
+            
+            # Only clear all page states when clicking on Latest Deals
+            # Other pages maintain their state when navigated to
+            if self.current_page == "latest_deals":
+                self.refresh_all_pages()
+            
             self.update_content()
 
     def update_content(self):
         """Update the main content area"""
         self.content_area.content = self.get_current_page_content()
         self.page.update()
+    
+    def refresh_current_page(self):
+        """Refresh the current page by clearing its state and reloading data"""
+        if self.current_page == "all_deals":
+            self.all_deals_page.refresh_page_state()
+        elif self.current_page == "latest_deals":
+            self.latest_deals_page.refresh_page_state()
+        elif self.current_page == "all_books":
+            self.all_books_page.refresh_page_state()
+    
+    def refresh_all_pages(self):
+        """Refresh all pages by clearing their state and reloading data"""
+        self.all_deals_page.refresh_page_state()
+        self.latest_deals_page.refresh_page_state()
+        self.all_books_page.refresh_page_state()
 
     def get_current_page_content(self):
         """Get content for the current page"""
@@ -205,6 +226,8 @@ class TBRDealFinderApp:
         """Return to deals page from book details"""
         self.current_page = "all_deals"
         self.nav_rail.selected_index = 0
+        # Refresh the page when returning to it
+        self.refresh_current_page()
         self.update_content()
 
     def config_updated(self, new_config: Config):
@@ -213,6 +236,8 @@ class TBRDealFinderApp:
         if self.current_page == "settings":
             self.current_page = "all_deals"
             self.nav_rail.selected_index = 0
+            # Refresh the page when returning from settings
+            self.refresh_current_page()
         self.update_content()
 
     async def run_latest_deals(self):
