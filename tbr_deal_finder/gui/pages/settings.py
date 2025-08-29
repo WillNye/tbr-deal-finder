@@ -174,22 +174,30 @@ class SettingsPage:
                     "Check for Updates",
                     icon=ft.Icons.SYSTEM_UPDATE,
                     on_click=lambda e: self.app.check_for_updates_button(),
-                    style=ft.ButtonStyle(bgcolor=ft.Colors.BLUE_600)
+                    style=ft.ButtonStyle(bgcolor=ft.Colors.BLUE_600),
                 )
             ], spacing=10),
             padding=20,
-            border=ft.border.all(1, ft.Colors.BLUE_200),
-            border_radius=8
         )
 
-        return ft.ListView([
+        # Main settings content
+        main_content = ft.ListView([
             ft.Text("Settings", size=24, weight=ft.FontWeight.BOLD),
             library_section,
             retailers_section,
             price_section,
-            button_row,
-            update_section
-        ], spacing=20, padding=ft.padding.all(20))
+            button_row
+        ], spacing=20, padding=ft.padding.all(20), expand=True)
+        
+        # Create layout with main content on left and update section on right
+        return ft.Row([
+            main_content,
+            ft.Container(
+                content=update_section,
+                width=300,
+                alignment=ft.alignment.top_left
+            )
+        ], spacing=20, expand=True)
 
     def update_library_paths_list(self):
         """Update the library paths list view"""

@@ -6,7 +6,7 @@ import threading
 
 from tbr_deal_finder.book import Book, BookFormat
 from tbr_deal_finder.tracked_books import get_tbr_books
-from .base_book_page import BaseBookPage
+from tbr_deal_finder.gui.pages.base_book_page import BaseBookPage
 
 logger = logging.getLogger(__name__)
 

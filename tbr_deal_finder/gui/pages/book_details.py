@@ -81,8 +81,22 @@ def build_book_price_section(historical_data: list[dict]) -> ft.Column:
                 ft.LineChartDataPoint(max_update_marker.timestamp(), last_price, tooltip=pad_tooltip)
             )
 
-            max_time = max_update_marker.timestamp()
             max_update_marker = max_update_marker + timedelta(days=1)
+
+    # Add data point if one doesn't exist for max time so lines don't just end abruptly
+    for retailer, data in retailer_data.items():
+        last_update = data["last_update"]
+        last_entry = last_update["timepoint"].timestamp()
+        if last_entry == max_time:
+            continue
+
+        last_price = last_update["current_price"]
+        pad_tooltip = f"{retailer}: {float_to_currency(last_price)}"
+        data["data"].append(
+            ft.LineChartDataPoint(max_time, last_price, tooltip=pad_tooltip)
+        )
+
+
 
     # Y-axis setup
     y_min = min_price // 5 * 5  # Keep as float

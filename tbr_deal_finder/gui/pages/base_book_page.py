@@ -1,6 +1,6 @@
 import flet as ft
 from abc import ABC, abstractmethod
-from typing import List, Optional, Any
+from typing import List, Any
 
 from tbr_deal_finder.book import Book, BookFormat
 

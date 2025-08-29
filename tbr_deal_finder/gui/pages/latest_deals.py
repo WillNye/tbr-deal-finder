@@ -6,7 +6,7 @@ from typing import List
 
 from tbr_deal_finder.book import get_deals_found_at, Book, BookFormat, is_qualifying_deal
 from tbr_deal_finder.utils import get_duckdb_conn, get_latest_deal_last_ran
-from .base_book_page import BaseBookPage
+from tbr_deal_finder.gui.pages.base_book_page import BaseBookPage
 
 
 class LatestDealsPage(BaseBookPage):
@@ -271,7 +271,6 @@ class LatestDealsPage(BaseBookPage):
             
             if success:
                 # Update the run time and load new deals
-                self.app.config.run_time = datetime.now()
                 self.last_run_time = self.app.config.run_time
                 self.load_items()
                 self.show_success(f"Found {len(self.items)} new deals!")

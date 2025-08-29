@@ -10,11 +10,11 @@ from tbr_deal_finder.retailer.models import Retailer
 from tbr_deal_finder.retailer_deal import get_latest_deals
 from tbr_deal_finder.desktop_updater import check_for_desktop_updates
 
-from .pages.settings import SettingsPage
-from .pages.all_deals import AllDealsPage
-from .pages.latest_deals import LatestDealsPage
-from .pages.all_books import AllBooksPage
-from .pages.book_details import BookDetailsPage
+from tbr_deal_finder.gui.pages.settings import SettingsPage
+from tbr_deal_finder.gui.pages.all_deals import AllDealsPage
+from tbr_deal_finder.gui.pages.latest_deals import LatestDealsPage
+from tbr_deal_finder.gui.pages.all_books import AllBooksPage
+from tbr_deal_finder.gui.pages.book_details import BookDetailsPage
 
 
 class TBRDealFinderApp:

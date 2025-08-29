@@ -2,8 +2,8 @@ import logging
 
 import flet as ft
 
-from tbr_deal_finder.book import get_active_deals, Book, BookFormat, is_qualifying_deal
-from .base_book_page import BaseBookPage
+from tbr_deal_finder.book import get_active_deals, Book, is_qualifying_deal
+from tbr_deal_finder.gui.pages.base_book_page import BaseBookPage
 
 logger = logging.getLogger(__name__)
 
