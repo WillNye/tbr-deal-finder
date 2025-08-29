@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import flet as ft
 
 from tbr_deal_finder.config import Config
@@ -198,21 +200,23 @@ class SettingsPage:
         # Add to overlay
         self.app.page.overlay.append(file_picker)
         self.app.page.update()
-        
+
         # Open the file picker
         file_picker.pick_files(
             dialog_title="Select Library Export File",
             file_type=ft.FilePickerFileType.CUSTOM,
+            initial_directory=str(Path.home()),
             allowed_extensions=["csv"]
         )
 
     def on_file_picker_result(self, e: ft.FilePickerResultEvent):
         """Handle file picker result (legacy method - not used with new implementation)"""
         if e.files:
-            new_path = e.files[0].path
-            if new_path not in self.library_paths:
-                self.library_paths.append(new_path)
-                self.update_library_paths_list()
+            for f in e.files:
+                new_path = f.path
+                if new_path not in self.library_paths:
+                    self.library_paths.append(new_path)
+                    self.update_library_paths_list()
 
     def remove_library_path(self, e):
         """Remove selected library paths"""
