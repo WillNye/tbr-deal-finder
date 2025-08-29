@@ -1,4 +1,5 @@
 import logging
+from collections import Counter
 
 import flet as ft
 from datetime import datetime, timedelta
@@ -33,11 +34,24 @@ def build_book_price_section(historical_data: list[dict]) -> ft.Column:
             retailer_data[record["retailer"]] = dict()
             retailer_data[record["retailer"]]["color"] = available_colors.pop(0)
             retailer_data[record["retailer"]]["data"] = []
+            retailer_data[record["retailer"]]["last_update"] = None
 
         # Convert datetime to timestamp for x-axis
         timestamp = record["timepoint"].timestamp()
         tooltip = f"{record['retailer']}: {float_to_currency(record['current_price'])}"
 
+        if last_update := retailer_data[record["retailer"]]["last_update"]:
+            max_update_marker = last_update["timepoint"] + timedelta(days=1)
+            last_price = last_update["current_price"]
+            pad_tooltip = f"{record['retailer']}: {float_to_currency(last_price)}"
+            # Padding to show more consistent info on graph hover
+            while record["timepoint"] > max_update_marker:
+                retailer_data[record["retailer"]]["data"].append(
+                    ft.LineChartDataPoint(max_update_marker.timestamp(), last_price, tooltip=pad_tooltip)
+                )
+                max_update_marker = max_update_marker + timedelta(days=1)
+
+        retailer_data[record["retailer"]]["last_update"] = record
         retailer_data[record["retailer"]]["data"].append(
             ft.LineChartDataPoint(timestamp, record["current_price"], tooltip=tooltip)
         )
@@ -53,6 +67,22 @@ def build_book_price_section(historical_data: list[dict]) -> ft.Column:
             min_time = timestamp
         if not max_time or timestamp > max_time:
             max_time = timestamp
+
+    # Add hover padding to current date
+    for retailer, data in retailer_data.items():
+        last_update = data["last_update"]
+        cur_time = datetime.now()
+        max_update_marker = last_update["timepoint"] + timedelta(days=1)
+        last_price = last_update["current_price"]
+        pad_tooltip = f"{retailer}: {float_to_currency(last_price)}"
+        # Padding to show more consistent info on graph hover
+        while cur_time > max_update_marker:
+            data["data"].append(
+                ft.LineChartDataPoint(max_update_marker.timestamp(), last_price, tooltip=pad_tooltip)
+            )
+
+            max_time = max_update_marker.timestamp()
+            max_update_marker = max_update_marker + timedelta(days=1)
 
     # Y-axis setup
     y_min = min_price // 5 * 5  # Keep as float
@@ -72,8 +102,9 @@ def build_book_price_section(historical_data: list[dict]) -> ft.Column:
     # Get unique months from the data
     unique_months = set()
     for record in historical_data:
-        month_year = record["timepoint"].strftime('%B %Y')
-        unique_months.add((record["timepoint"].timestamp(), month_year))
+        timepoint = record["timepoint"].replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        month_year = timepoint.strftime('%B %Y')
+        unique_months.add((timepoint.timestamp(), month_year))
 
     # Sort by timestamp and create labels
     for timestamp, month_year in sorted(unique_months):
@@ -112,7 +143,7 @@ def build_book_price_section(historical_data: list[dict]) -> ft.Column:
             width=1,
         ),
         left_axis=ft.ChartAxis(labels=y_axis_labels, labels_size=50),
-        bottom_axis=ft.ChartAxis(labels=x_axis_labels),
+        bottom_axis=ft.ChartAxis(labels=x_axis_labels, labels_interval=3600),  # 1 hour
         expand=False,
         height=200,
         width=850,
@@ -406,7 +437,7 @@ class BookDetailsPage:
 
     def build_historical_chart(self):
         """Build historical pricing chart"""
-        if not self.historical_data:
+        if not self.has_historical_data():
             return ft.Container(
                 content=ft.Column([
                     ft.Text("Historical Pricing", size=20, weight=ft.FontWeight.BOLD),
@@ -452,13 +483,27 @@ class BookDetailsPage:
         if self.current_deals:
             prices = [deal.current_price for deal in self.current_deals]
             discounts = [deal.discount() for deal in self.current_deals]
-            
-            info_items.extend([
-                self.create_info_row("Lowest Price", f"${min(prices):.2f}"),
-                self.create_info_row("Highest Price", f"${max(prices):.2f}"),
-                self.create_info_row("Best Discount", f"{max(discounts)}%"),
+
+
+            if len(prices) > 1:
+                info_items.append(self.create_info_row("Lowest Price", f"${min(prices):.2f}"))
+            else:
+                info_items.append(self.create_info_row("Current Price", f"${min(prices):.2f}"))
+
+            if self.has_historical_data():
+                historical_prices = [retailer["current_price"] for retailer in self.historical_data]
+                lowest_ever_price = min(historical_prices)
+                info_items.append(self.create_info_row("Lowest Ever", f"${lowest_ever_price:.2f}"))
+
+            if len(prices) > 1:
+                info_items.extend([
+                    self.create_info_row("Highest Price", f"${max(prices):.2f}"),
+                    self.create_info_row("Best Discount", f"{max(discounts)}%"),
+                ])
+
+            info_items.append(
                 self.create_info_row("Available At", f"{len(self.current_deals)} retailer(s)")
-            ])
+            )
         
         return ft.Container(
             content=ft.Column([
@@ -531,6 +576,15 @@ class BookDetailsPage:
         )
         
         self.historical_data = results
+
+    def has_historical_data(self) -> bool:
+        """Returns True if at least one retailer has more than 1 record in retailer_deal"""
+        if not self.historical_data:
+            return False
+
+        retailer_refs = [deal["retailer"] for deal in self.historical_data]
+        retailer_counts = Counter(retailer_refs)
+        return any(rc > 1 for rc in retailer_counts.values())
 
     def refresh_data(self):
         """Refresh book data"""
