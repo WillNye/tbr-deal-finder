@@ -15,6 +15,7 @@ dependencies = [
     "pandas>=2.3.1",
     "pandas-stubs==2.3.0.250703",
     "plotly>=5.17.0",
+    "pyinstaller>=6.15.0",
     "questionary>=2.1.0",
     "tqdm>=4.67.1",
     "unidecode>=1.4.0",
