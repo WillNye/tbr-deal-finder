@@ -8,6 +8,7 @@ from tbr_deal_finder.book import Book, BookFormat
 from tbr_deal_finder.retailer import RETAILER_MAP
 from tbr_deal_finder.retailer.models import Retailer
 from tbr_deal_finder.retailer_deal import get_latest_deals
+from tbr_deal_finder.desktop_updater import check_for_desktop_updates
 
 from .pages.settings import SettingsPage
 from .pages.all_deals import AllDealsPage
@@ -22,6 +23,7 @@ class TBRDealFinderApp:
         self.config = None
         self.current_page = "all_deals"
         self.selected_book = None
+        self.update_info = None  # Store update information
         
         # Initialize pages
         self.settings_page = SettingsPage(self)
@@ -224,11 +226,9 @@ class TBRDealFinderApp:
             # Then fetch the deals (retailers should already be authenticated)
             return await get_latest_deals(self.config)
         except Exception as e:
-            print(f"Error getting latest deals: {e}")
             return False
 
     async def auth_all_configured_retailers(self):
-        print("Starting auth_all_configured_retailers")
         for retailer_str in self.config.tracked_retailers:
             retailer = RETAILER_MAP[retailer_str]()
 
@@ -238,7 +238,6 @@ class TBRDealFinderApp:
 
             # Use GUI auth instead of CLI auth
             await self.show_auth_dialog(retailer)
-            print(f"Auth dialog completed for {retailer_str}")
 
     async def show_auth_dialog(self, retailer: Retailer):
         """Show authentication dialog for retailer login"""
@@ -278,7 +277,6 @@ class TBRDealFinderApp:
                     error_text.visible = True
                     self.page.update()
             except Exception as ex:
-                print(f"Error during auth: {ex}")
                 self._auth_dialog_result = False
                 self._auth_dialog_complete = True
 
@@ -392,6 +390,146 @@ class TBRDealFinderApp:
         self._auth_dialog_complete = False
 
         return result
+
+    def check_for_updates_manual(self):
+        """Check for updates manually when user clicks button."""
+        
+        # Check for updates
+        update_info = check_for_desktop_updates()
+
+        if update_info:
+            # Update available - show banner
+            self.update_info = update_info
+            self.show_update_notification()
+        else:
+            # No update available - show up-to-date message
+            self.show_up_to_date_message()
+
+    def show_update_notification(self):
+        """Show update notification dialog."""
+        if not self.update_info:
+            return
+        
+        def close_dialog(e):
+            dialog.open = False
+            self.page.update()
+        
+        def view_release_and_close(e):
+            self.view_release_notes(e)
+            close_dialog(e)
+            
+        def download_and_close(e):
+            self.download_update(e)
+            close_dialog(e)
+        
+        # Create update dialog
+        dialog = ft.AlertDialog(
+            title=ft.Row([
+                ft.Icon(ft.Icons.SYSTEM_UPDATE, color=ft.Colors.BLUE, size=30),
+                ft.Text("Update Available", weight=ft.FontWeight.BOLD)
+            ], spacing=10),
+            content=ft.Column([
+                ft.Text(f"Version {self.update_info['version']} is now available!"),
+                ft.Text("Would you like to download the update?", color=ft.Colors.GREY_600)
+            ], spacing=10, tight=True),
+            actions=[
+                ft.TextButton("View Release Notes", on_click=view_release_and_close),
+                ft.ElevatedButton("Download Update", on_click=download_and_close),
+                ft.TextButton("Later", on_click=close_dialog),
+            ],
+            modal=True
+        )
+        
+        self.page.overlay.append(dialog)
+        dialog.open = True
+        self.page.update()
+
+    def show_up_to_date_message(self):
+        """Show message that app is up to date."""
+        def close_dialog(e):
+            dialog.open = False
+            self.page.update()
+        
+        # Create up-to-date dialog
+        dialog = ft.AlertDialog(
+            title=ft.Row([
+                ft.Icon(ft.Icons.CHECK_CIRCLE, color=ft.Colors.GREEN, size=30),
+                ft.Text("Up to Date", weight=ft.FontWeight.BOLD)
+            ], spacing=10),
+            content=ft.Text("You're running the latest version!"),
+            actions=[
+                ft.ElevatedButton("OK", on_click=close_dialog),
+            ],
+            modal=True
+        )
+        
+        self.page.overlay.append(dialog)
+        dialog.open = True
+        self.page.update()
+
+    def view_release_notes(self, e):
+        """Open release notes in browser."""
+        if self.update_info:
+            import webbrowser
+            webbrowser.open(self.update_info['release_url'])
+
+    def download_update(self, e):
+        """Handle update download."""
+        if not self.update_info or not self.update_info.get('download_url'):
+            return
+        
+        # For now, open download URL in browser
+        # In a more advanced implementation, you could download in-app
+        import webbrowser
+        webbrowser.open(self.update_info['download_url'])
+        
+        # Show download instructions
+        self.show_download_instructions()
+
+    def show_download_instructions(self):
+        """Show instructions for installing the downloaded update."""
+        def close_dialog(e):
+            dialog.open = False
+            self.page.update()
+        
+        instructions = {
+            "darwin": "1. Download will start in your browser\n2. Open the downloaded .dmg file\n3. Drag the app to Applications folder\n4. Restart the application",
+            "windows": "1. Download will start in your browser\n2. Run the downloaded .exe installer\n3. Follow the installation wizard\n4. Restart the application",
+        }
+        
+        import platform
+        current_platform = platform.system().lower()
+        instruction_text = instructions.get(current_platform, "Download the update and follow installation instructions.")
+        
+        dialog = ft.AlertDialog(
+            title=ft.Text("Update Installation"),
+            content=ft.Column([
+                ft.Text(f"Version {self.update_info['version']} Download Instructions:"),
+                ft.Text(instruction_text, selectable=True),
+                ft.Divider(),
+                ft.Text("Release Notes:", weight=ft.FontWeight.BOLD),
+                ft.Text(
+                    self.update_info.get('release_notes', 'No release notes available.')[:500] + 
+                    ('...' if len(self.update_info.get('release_notes', '')) > 500 else ''),
+                    selectable=True
+                )
+            ], width=400, height=300, scroll=ft.ScrollMode.AUTO),
+            actions=[
+                ft.TextButton("OK", on_click=close_dialog)
+            ],
+            modal=True
+        )
+        
+        self.page.overlay.append(dialog)
+        dialog.open = True
+        self.page.update()
+
+
+
+    def check_for_updates_button(self):
+        """Check for updates when button is clicked."""
+        self.check_for_updates_manual()
+
 
 
 def main():

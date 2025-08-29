@@ -164,13 +164,31 @@ class SettingsPage:
                 on_click=self.cancel_changes
             )
         ], spacing=10)
+        
+        # Update check section
+        update_section = ft.Container(
+            content=ft.Column([
+                ft.Text("Application Updates", size=16, weight=ft.FontWeight.BOLD),
+                ft.Text("Check for the latest version", color=ft.Colors.GREY_600),
+                ft.ElevatedButton(
+                    "Check for Updates",
+                    icon=ft.Icons.SYSTEM_UPDATE,
+                    on_click=lambda e: self.app.check_for_updates_button(),
+                    style=ft.ButtonStyle(bgcolor=ft.Colors.BLUE_600)
+                )
+            ], spacing=10),
+            padding=20,
+            border=ft.border.all(1, ft.Colors.BLUE_200),
+            border_radius=8
+        )
 
         return ft.ListView([
             ft.Text("Settings", size=24, weight=ft.FontWeight.BOLD),
             library_section,
             retailers_section,
             price_section,
-            button_row
+            button_row,
+            update_section
         ], spacing=20, padding=ft.padding.all(20))
 
     def update_library_paths_list(self):
