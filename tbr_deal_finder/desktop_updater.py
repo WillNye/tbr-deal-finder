@@ -43,12 +43,10 @@ class DesktopUpdater:
             release_data = response.json()
             latest_version = release_data["tag_name"].lstrip("v")
             if version.parse(latest_version) > version.parse(self.current_version):
-                # Find appropriate asset for current platform
                 release_url = release_data["html_url"]
-                download_url = self._find_platform_asset(release_data["assets"]) or release_url
                 return {
                     "version": latest_version,
-                    "download_url": download_url,
+                    "download_url": release_url,
                     "release_notes": release_data.get("body", ""),
                     "release_url": release_url
                 }
@@ -58,22 +56,6 @@ class DesktopUpdater:
         except Exception as e:
             logger.error(f"Failed to check updates for {self.github_repo}: {e}")
             return None
-    
-    def _find_platform_asset(self, assets: list) -> Optional[str]:
-        """Find the appropriate download asset for current platform."""
-        platform_patterns = {
-            "darwin": [".dmg", "-macos", "-mac"],
-            "windows": [".exe", "-windows", "-win"],
-        }
-        
-        patterns = platform_patterns.get(self.platform, [])
-        
-        for asset in assets:
-            asset_name = asset["name"].lower()
-            if any(pattern in asset_name for pattern in patterns):
-                return asset["browser_download_url"]
-        
-        return None
     
     def download_update(self, download_url: str, progress_callback=None) -> Optional[Path]:
         """
