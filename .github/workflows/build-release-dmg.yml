@@ -4,6 +4,9 @@ on:
   release:
     types: [created, edited]
 
+permissions:
+  contents: write
+  
 jobs:
   build-dmg:
     runs-on: macos-latest
@@ -47,14 +50,13 @@ jobs:
         echo "📦 DMG Size: $DMG_SIZE"
         
     - name: Upload DMG to Release
-      uses: actions/upload-release-asset@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ github.event.release.upload_url }}
-        asset_path: gui_dist/TBRDealFinder.dmg
-        asset_name: TBRDealFinder-${{ github.event.release.tag_name }}-macOS.dmg
-        asset_content_type: application/x-apple-diskimage
+      run: |
+        gh release upload ${{ github.event.release.tag_name }} \
+          gui_dist/TBRDealFinder.dmg \
+          --clobber \
+          --repo ${{ github.repository }}
         
     - name: Update Release Description
       uses: actions/github-script@v7
