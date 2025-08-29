@@ -215,7 +215,7 @@ class LatestDealsPage(BaseBookPage):
                     trailing=ft.Column([
                         ft.Text(deal.retailer, weight=ft.FontWeight.BOLD, size=12)
                     ], alignment=ft.MainAxisAlignment.CENTER),
-                    on_click=lambda e, book=deal: self.app.show_book_details(book)
+                    on_click=lambda e, book=deal: self.app.show_book_details(book, format_type=book.format)
                 ),
                 padding=5
             )

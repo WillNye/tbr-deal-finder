@@ -189,7 +189,7 @@ class TBRDealFinderApp:
         self.selected_book = book
         
         # Set the initial format if specified
-        if format_type:
+        if format_type is not None and format_type != BookFormat.NA:
             self.book_details_page.set_initial_format(format_type)
         else:
             # Reset selected format so it uses default logic

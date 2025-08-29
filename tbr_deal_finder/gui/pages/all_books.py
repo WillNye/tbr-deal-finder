@@ -109,10 +109,10 @@ class AllBooksPage(BaseBookPage):
                     subtitle=ft.Column([
                         ft.Text(f"by {book.authors}", color=ft.Colors.GREY_600),
                     ], spacing=2),
-                    on_click=lambda e, b=book: self.app.show_book_details(b)
+                    on_click=lambda e, b=book: self.app.show_book_details(b, b.format)
                 ),
                 padding=10,
-                on_click=lambda e, b=book: self.app.show_book_details(b)
+                on_click=lambda e, b=book: self.app.show_book_details(b, b.format)
             )
         )
 
