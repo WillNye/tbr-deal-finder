@@ -9,6 +9,7 @@ Notes:
 * Added a GUI to serve as a desktop app
 * Added retry behavior to Kindle and Libro on get_book call
 * Saving all pricing info to be used for historical pricing details
+* Added version checking to the CLI
 
 BUG FIXES:
 * Improvements to grouping titles in TBR 
