@@ -21,10 +21,12 @@ from tbr_deal_finder.utils import (
     get_duckdb_conn,
     get_latest_deal_last_ran
 )
+from tbr_deal_finder.version_check import notify_if_outdated
 
 
 @click.group()
 def cli():
+    notify_if_outdated()
     make_migrations()
 
 
