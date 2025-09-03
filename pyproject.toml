@@ -27,17 +27,15 @@ tbr-deal-finder-gui = "tbr_deal_finder.gui.main:main"
 
 [tool.flet]
 product = "TBR Deal Finder"
-
 app.module = "tbr_deal_finder"
 app.path = "."
-app.icon = "tbr_deal_finder/gui/assets/logo.png"
 
 [tool.setuptools.package-data]
 "tbr-deal-finder" = [
     "queries/**/*.sql",
     "reports/*.j2",
     "data/*.json",
-    "tbr_deal_finder/gui/assets/*"
+    "assets/*"
 ]
 
 [build-system]
