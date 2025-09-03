@@ -14,47 +14,99 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-      
+        
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: '3.13'
-        
+
     - name: Install uv
-      run: |
-        curl -LsSf https://astral.sh/uv/install.sh | sh
-        echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+      uses: astral-sh/setup-uv@v5
         
     - name: Install project dependencies
       run: |
         uv sync
+
+    - name: Set up Xcode
+      uses: maxim-lobanov/setup-xcode@v1
+      with:
+        xcode-version: latest-stable
+        
+    - name: Set up CocoaPods
+      uses: maxim-lobanov/setup-cocoapods@v1
+      with:
+        version: latest
+
+    - name: Import Code Signing Certificate (if available)
+      if: ${{ secrets.MACOS_CERTIFICATE != '' && secrets.MACOS_CERTIFICATE_PASSWORD != '' }}
+      run: |
+        # Create temporary keychain
+        security create-keychain -p "temp_keychain_password" temp.keychain
+        security default-keychain -s temp.keychain
+        security unlock-keychain -p "temp_keychain_password" temp.keychain
+        
+        # Import certificate
+        echo "${{ secrets.MACOS_CERTIFICATE }}" | base64 --decode > certificate.p12
+        security import certificate.p12 -k temp.keychain -P "${{ secrets.MACOS_CERTIFICATE_PASSWORD }}" -T /usr/bin/codesign
+        
+        # Allow codesign to access the certificate
+        security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "temp_keychain_password" temp.keychain
+        
+        # Set code signing identity
+        if [ -n "${{ secrets.CODESIGN_IDENTITY }}" ]; then
+            # Use provided identity name
+            echo "CODESIGN_IDENTITY=${{ secrets.CODESIGN_IDENTITY }}" >> $GITHUB_ENV
+            echo "✅ Code signing certificate imported: ${{ secrets.CODESIGN_IDENTITY }}"
+        else
+            # Auto-detect identity from certificate
+            CERT_IDENTITY=$(security find-identity -v -p codesigning temp.keychain | head -1 | grep -o '"[^"]*"' | tr -d '"')
+            echo "CODESIGN_IDENTITY=$CERT_IDENTITY" >> $GITHUB_ENV
+            echo "✅ Code signing certificate imported (auto-detected): $CERT_IDENTITY"
+        fi
+        
+        # Clean up certificate file
+        rm -f certificate.p12
         
     - name: Build DMG
       run: |
         make build-mac
         
-    - name: Verify DMG was created
+    - name: Cleanup Code Signing
+      if: ${{ secrets.MACOS_CERTIFICATE != '' && secrets.MACOS_CERTIFICATE_PASSWORD != '' }}
+      run: |
+        # Remove temporary keychain
+        security delete-keychain temp.keychain || true
+        echo "🧹 Cleaned up code signing keychain"
+        
+    - name: Find and verify DMG was created
+      id: find-dmg
       run: |
         ls -la gui_dist/
-        if [ ! -f "gui_dist/TBRDealFinder.dmg" ]; then
+        DMG_FILE=$(find gui_dist/ -name "*.dmg" -type f | head -1)
+        if [ -z "$DMG_FILE" ]; then
           echo "❌ DMG file not found!"
+          echo "Contents of gui_dist/:"
+          ls -la gui_dist/ || echo "gui_dist/ directory not found"
           exit 1
         fi
-        echo "✅ DMG file created successfully"
+        echo "✅ DMG file created successfully: $DMG_FILE"
+        echo "dmg_path=$DMG_FILE" >> $GITHUB_OUTPUT
+        echo "dmg_name=$(basename $DMG_FILE)" >> $GITHUB_OUTPUT
         
     - name: Get DMG info
       id: dmg-info
       run: |
-        DMG_SIZE=$(ls -lh gui_dist/TBRDealFinder.dmg | awk '{print $5}')
+        DMG_SIZE=$(ls -lh "${{ steps.find-dmg.outputs.dmg_path }}" | awk '{print $5}')
         echo "size=$DMG_SIZE" >> $GITHUB_OUTPUT
         echo "📦 DMG Size: $DMG_SIZE"
+        echo "📦 DMG Name: ${{ steps.find-dmg.outputs.dmg_name }}"
         
     - name: Upload DMG to Release
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         gh release upload ${{ github.event.release.tag_name }} \
-          gui_dist/TBRDealFinder.dmg \
+          "${{ steps.find-dmg.outputs.dmg_path }}" \
           --clobber \
           --repo ${{ github.repository }}
 
