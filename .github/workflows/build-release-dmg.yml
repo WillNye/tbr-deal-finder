@@ -10,6 +10,9 @@ permissions:
 jobs:
   build-dmg:
     runs-on: macos-latest
+    env:
+      HAS_MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE != '' }}
+      HAS_MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD != '' }}
     
     steps:
     - name: Checkout code
@@ -38,7 +41,7 @@ jobs:
         version: latest
 
     - name: Import Code Signing Certificate (if available)
-      if: ${{ secrets.MACOS_CERTIFICATE != '' && secrets.MACOS_CERTIFICATE_PASSWORD != '' }}
+      if: ${{ env.HAS_MACOS_CERTIFICATE == 'true' && env.HAS_MACOS_CERTIFICATE_PASSWORD == 'true' }}
       run: |
         # Create temporary keychain
         security create-keychain -p "temp_keychain_password" temp.keychain
@@ -72,7 +75,7 @@ jobs:
         make build-mac
         
     - name: Cleanup Code Signing
-      if: ${{ secrets.MACOS_CERTIFICATE != '' && secrets.MACOS_CERTIFICATE_PASSWORD != '' }}
+      if: ${{ env.HAS_MACOS_CERTIFICATE == 'true' && env.HAS_MACOS_CERTIFICATE_PASSWORD == 'true' }}
       run: |
         # Remove temporary keychain
         security delete-keychain temp.keychain || true
