@@ -155,95 +155,11 @@ def build_with_pyinstaller():
 
 def sign_application():
     """Sign the application for the current platform."""
-    if IS_MACOS:
-        return sign_macos_app()
-    elif IS_WINDOWS:
+    if IS_WINDOWS:
         return sign_windows_exe()
     else:
         print("ℹ️  No signing required for Linux")
         return True
-
-
-def sign_macos_app():
-    """Sign macOS app bundle with ad-hoc signing."""
-    app_path = Path("gui_dist") / f"{PROJECT_NAME.replace(' ', '')}.app"
-    if not app_path.exists():
-        print(f"❌ macOS app bundle not found at {app_path}")
-        return False
-    
-    print("🔐 Signing macOS app bundle with ad-hoc signing...")
-    
-    try:
-        # First, remove any existing signatures that might conflict
-        subprocess.run([
-            "codesign", "--remove-signature", "--deep", str(app_path)
-        ], check=False, capture_output=True)  # Don't fail if no signature exists
-        
-        # Sign all frameworks and libraries first (ad-hoc signing doesn't use timestamps)
-        frameworks_dir = app_path / "Contents" / "Frameworks"
-        if frameworks_dir.exists():
-            for item in frameworks_dir.rglob("*"):
-                if item.is_file() and (item.suffix in ['.dylib', '.so'] or 'framework' in str(item).lower()):
-                    subprocess.run([
-                        "codesign", "--force", "--sign", SIGNING_IDENTITY, str(item)
-                    ], check=True, capture_output=True)
-        
-        # Sign all internal binaries
-        internal_dir = app_path / "Contents" / "MacOS"
-        if internal_dir.exists():
-            for item in internal_dir.rglob("*"):
-                if item.is_file() and item != internal_dir / f"{PROJECT_NAME.replace(' ', '')}":
-                    subprocess.run([
-                        "codesign", "--force", "--sign", SIGNING_IDENTITY, str(item)
-                    ], check=False, capture_output=True)  # Don't fail on non-binary files
-        
-        # Create entitlements file for library validation bypass
-        entitlements_path = Path("entitlements.plist")
-        entitlements_content = '''<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>com.apple.security.cs.allow-dyld-environment-variables</key>
-    <true/>
-    <key>com.apple.security.cs.disable-library-validation</key>
-    <true/>
-</dict>
-</plist>'''
-        entitlements_path.write_text(entitlements_content)
-        
-        # Sign the main executable with entitlements
-        main_executable = app_path / "Contents" / "MacOS" / f"{PROJECT_NAME.replace(' ', '')}"
-        subprocess.run([
-            "codesign", "--force", "--sign", SIGNING_IDENTITY,
-            "--entitlements", str(entitlements_path),
-            str(main_executable)
-        ], check=True)
-        
-        # Finally, sign the main app bundle with entitlements
-        subprocess.run([
-            "codesign", "--force", "--sign", SIGNING_IDENTITY,
-            "--entitlements", str(entitlements_path),
-            str(app_path)
-        ], check=True)
-        
-        # Clean up entitlements file
-        entitlements_path.unlink()
-        
-        print("✅ macOS app bundle signed successfully (ad-hoc)")
-        return True
-    except subprocess.CalledProcessError as e:
-        print(f"❌ macOS app bundle signing failed: {e}")
-        # Try a simpler signing approach as fallback
-        try:
-            print("🔄 Trying simpler signing approach...")
-            subprocess.run([
-                "codesign", "--force", "--deep", "--sign", SIGNING_IDENTITY, str(app_path)
-            ], check=True)
-            print("✅ macOS app bundle signed with simpler approach")
-            return True
-        except subprocess.CalledProcessError as e2:
-            print(f"❌ Fallback signing also failed: {e2}")
-            return False
 
 
 def sign_windows_exe():
@@ -297,46 +213,13 @@ def sign_windows_exe():
 
 def create_distribution():
     """Create platform-specific distribution package."""
-    if IS_MACOS:
-        return create_macos_dmg()
-    elif IS_WINDOWS:
+    if IS_WINDOWS:
         return create_windows_installer()
     elif IS_LINUX:
         return create_linux_appimage()
     else:
         print(f"⚠️  No distribution package creation for {CURRENT_PLATFORM}")
         return True
-
-
-def create_macos_dmg():
-    """Create a macOS DMG file."""
-    print("📦 Creating macOS DMG...")
-    
-    app_path = Path("gui_dist") / f"{PROJECT_NAME.replace(' ', '')}.app"
-    dmg_path = Path("gui_dist") / f"{PROJECT_NAME.replace(' ', '')}.dmg"
-    
-    if not app_path.exists():
-        print(f"❌ macOS app bundle not found at {app_path}")
-        return False
-    
-    # Remove existing DMG
-    if dmg_path.exists():
-        dmg_path.unlink()
-    
-    try:
-        subprocess.run([
-            "hdiutil", "create",
-            "-volname", PROJECT_NAME,
-            "-srcfolder", str(app_path),
-            "-ov", "-format", "UDZO",
-            str(dmg_path)
-        ], check=True)
-        
-        print(f"✅ macOS DMG created: {dmg_path}")
-        return True
-    except subprocess.CalledProcessError as e:
-        print(f"❌ macOS DMG creation failed: {e}")
-        return False
 
 
 def create_windows_installer():
@@ -380,43 +263,13 @@ def create_linux_appimage():
 
 def sign_distribution():
     """Sign the distribution package for the current platform."""
-    if IS_MACOS:
-        return sign_macos_dmg()
-    elif IS_WINDOWS:
+    if IS_WINDOWS:
         # Windows exe is already signed in sign_application()
         print("ℹ️  Windows executable already signed")
         return True
     else:
         print("ℹ️  No distribution signing required for Linux")
         return True
-
-
-def sign_macos_dmg():
-    """Sign the macOS DMG file."""
-    if not SIGNING_IDENTITY:
-        print("⚠️  Skipping macOS DMG signing (no identity)")
-        return True
-    
-    dmg_path = Path("gui_dist") / f"{PROJECT_NAME.replace(' ', '')}.dmg"
-    if not dmg_path.exists():
-        print(f"❌ macOS DMG not found at {dmg_path}")
-        return False
-    
-    print("🔐 Signing macOS DMG...")
-    
-    try:
-        # Ad-hoc signing doesn't support timestamps, so don't use --timestamp
-        subprocess.run([
-            "codesign", "--force", "--verify", "--verbose",
-            "--sign", SIGNING_IDENTITY,
-            str(dmg_path)
-        ], check=True)
-        
-        print("✅ macOS DMG signed successfully")
-        return True
-    except subprocess.CalledProcessError as e:
-        print(f"❌ macOS DMG signing failed: {e}")
-        return False
 
 
 def verify_signatures():
@@ -427,44 +280,10 @@ def verify_signatures():
     
     print("🔍 Verifying signatures...")
     
-    if IS_MACOS:
-        verify_macos_signatures()
-    elif IS_WINDOWS:
+    if IS_WINDOWS:
         verify_windows_signatures()
     else:
         print("ℹ️  No signature verification needed for Linux")
-
-
-def verify_macos_signatures():
-    """Verify macOS signatures."""
-    app_path = Path("gui_dist") / f"{PROJECT_NAME.replace(' ', '')}.app"
-    dmg_path = Path("gui_dist") / f"{PROJECT_NAME.replace(' ', '')}.dmg"
-    
-    if app_path.exists():
-        try:
-            result = subprocess.run([
-                "codesign", "--verify", "--deep", "--strict", str(app_path)
-            ], capture_output=True, text=True)
-            
-            if result.returncode == 0:
-                print("✅ macOS app bundle signature verified")
-            else:
-                print(f"⚠️  macOS app bundle signature issues: {result.stderr}")
-        except Exception as e:
-            print(f"❌ Error verifying macOS app bundle: {e}")
-    
-    if dmg_path.exists():
-        try:
-            result = subprocess.run([
-                "codesign", "--verify", "--strict", str(dmg_path)
-            ], capture_output=True, text=True)
-            
-            if result.returncode == 0:
-                print("✅ macOS DMG signature verified")
-            else:
-                print(f"⚠️  macOS DMG signature issues: {result.stderr}")
-        except Exception as e:
-            print(f"❌ Error verifying macOS DMG: {e}")
 
 
 def verify_windows_signatures():

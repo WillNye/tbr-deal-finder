@@ -1,16 +1,15 @@
 # TBR Deal Finder Build System
-.PHONY: help install-deps build-mac build-mac-spec build-windows build-windows-docker build-linux build-all clean clean-all test-mac status
+.PHONY: help build-mac build-windows build-windows-docker build-linux build-all clean clean-all test-mac status create-cert
 
 # Default target
 help:
 	@echo "TBR Deal Finder Build Commands:"
 	@echo ""
 	@echo "Setup:"
-	@echo "  make install-deps    Install build dependencies"
+	@echo "  make create-cert     Create self-signed certificate (one-time setup) 🔐"
 	@echo ""
 	@echo "Building:"
 	@echo "  make build-mac       Build self-signed macOS DMG ⭐"
-	@echo "  make build-mac-spec  Build using .spec file (faster)"
 	@echo "  make build-windows   Build Windows EXE (GitHub Actions) ⭐"
 	@echo "  make build-linux     Build Linux executable"
 	@echo "  make build-all       Build for current platform"
@@ -29,42 +28,17 @@ PROJECT_NAME := TBR Deal Finder
 DIST_DIR := gui_dist
 BUILD_SCRIPT := scripts/packaging/build_cross_platform.py
 
-# Install build dependencies
-install-deps:
-	@echo "📦 Installing build dependencies..."
-	uv add pyinstaller
-	@echo "✅ Dependencies installed"
-
 # Build self-signed macOS DMG (recommended)
-build-mac: install-deps
-	@echo "🍎 Building self-signed macOS DMG..."
-	uv run python $(BUILD_SCRIPT)
+build-mac:
+	@echo "🍎 Building app"
+# 	uv run flet build macos --output ${DIST_DIR}/app/
 	@echo ""
+	@echo "📦 Creating self-signed macOS DMG for app"
+	bash scripts/packaging/create_dmg.sh
 	@echo "✅ Self-signed macOS DMG built successfully!"
-	@echo "📦 Output: $(DIST_DIR)/TBRDealFinder.dmg"
-	@ls -lh $(DIST_DIR)/*.dmg 2>/dev/null || true
-
-# Build using existing .spec file (faster for development)
-build-mac-spec: install-deps
-	@if [ ! -f "TBRDealFinder.spec" ]; then \
-		echo "❌ TBRDealFinder.spec not found. Run 'make build-mac' first to generate it."; \
-		exit 1; \
-	fi
-	@echo "⚡ Building macOS DMG using .spec file..."
-	uv run pyinstaller TBRDealFinder.spec
-	@echo "📦 Creating DMG..."
-	@if [ -d "$(DIST_DIR)/TBRDealFinder.app" ]; then \
-		hdiutil create -volname "TBR Deal Finder" -srcfolder "$(DIST_DIR)/TBRDealFinder.app" -ov -format UDZO "$(DIST_DIR)/TBRDealFinder.dmg"; \
-		echo "✅ macOS DMG built using .spec (faster)!"; \
-		echo "📦 Output: $(DIST_DIR)/TBRDealFinder.dmg"; \
-		ls -lh $(DIST_DIR)/*.dmg 2>/dev/null || true; \
-	else \
-		echo "❌ App bundle not found after PyInstaller build"; \
-		exit 1; \
-	fi
 
 # Build Windows EXE (requires Windows or GitHub Actions)
-build-windows: install-deps
+build-windows:
 	@echo "🪟 Building Windows EXE..."
 	@if [ "$(shell uname -s)" = "MINGW32_NT" ] || [ "$(shell uname -s)" = "MINGW64_NT" ] || [ "$(shell uname -s)" = "CYGWIN_NT" ] || [ "$(shell echo $(OS))" = "Windows_NT" ]; then \
 		echo "🪟 Building Windows EXE natively..."; \
@@ -104,7 +78,7 @@ test-mac:
 		echo "❌ DMG mount failed"
 
 # Build Linux executable (works on Linux)
-build-linux: install-deps
+build-linux:
 	@echo "🐧 Building Linux executable..."
 	@if [ "$(shell uname -s)" != "Linux" ]; then \
 		echo "⚠️  Linux builds require Linux OS"; \
@@ -153,7 +127,6 @@ clean:
 	rm -rf $(DIST_DIR)/*.exe
 	rm -rf $(DIST_DIR)/TBRDealFinder
 	rm -rf build/
-	rm -rf dist/
 	@echo "✅ Clean complete (kept .spec file)"
 
 # Clean everything including .spec file
@@ -164,6 +137,12 @@ clean-all:
 	rm -rf dist/
 	rm -f *.spec
 	@echo "✅ Complete clean finished"
+
+# Create self-signed certificate for consistent code signing
+create-cert:
+	@echo "🔐 Creating self-signed certificate for consistent code signing..."
+	@echo ""
+	@bash scripts/create-self-signed-cert.sh
 
 # Show build status
 status:
@@ -181,3 +160,6 @@ status:
 	@echo ""
 	@echo "Dependencies:"
 	@uv tree --depth 1 | grep -E "(flet|pyinstaller)" || echo "  Not installed"
+	@echo ""
+	@echo "Code signing certificates:"
+	@security find-identity -v -p codesigning 2>/dev/null | grep -E "(TBR Deal Finder|Developer ID)" || echo "  None found (will use ad-hoc signing)"
