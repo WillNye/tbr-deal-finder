@@ -11,7 +11,7 @@ from tbr_deal_finder.config import Config
 from tbr_deal_finder.tracked_books import get_tbr_books, get_unknown_books, set_unknown_books
 from tbr_deal_finder.retailer import RETAILER_MAP
 from tbr_deal_finder.retailer.models import Retailer
-from tbr_deal_finder.utils import get_duckdb_conn, echo_warning, echo_info, echo_err
+from tbr_deal_finder.utils import get_duckdb_conn, echo_info, echo_err, is_gui_env
 
 
 def update_retailer_deal_table(config: Config, new_deals: list[Book]):
@@ -80,7 +80,12 @@ async def _get_books(
         for book in books
         if book.deal_id not in ignored_deal_ids
     ]
-    results = await tqdm_asyncio.gather(*tasks, desc=f"Getting latest prices from {retailer.name}")
+
+    if is_gui_env():
+        results = await asyncio.gather(*tasks)
+    else:
+        results = await tqdm_asyncio.gather(*tasks, desc=f"Getting latest prices from {retailer.name}")
+
     for book in results:
         if not book:
             """Cases where we know the retailer has the book but it's not coming back.

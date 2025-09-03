@@ -14,7 +14,7 @@ from tbr_deal_finder.owned_books import get_owned_books
 from tbr_deal_finder.retailer import Chirp, RETAILER_MAP, LibroFM, Kindle
 from tbr_deal_finder.config import Config
 from tbr_deal_finder.retailer.models import Retailer
-from tbr_deal_finder.utils import execute_query, get_duckdb_conn, get_query_by_name
+from tbr_deal_finder.utils import execute_query, get_duckdb_conn, get_query_by_name, is_gui_env
 
 
 def _library_export_tbr_books(config: Config, tbr_book_map: dict[str: Book]):
@@ -139,16 +139,20 @@ async def _set_tbr_book_attr(
     tbr_books_map = {b.full_title_str: b for b in tbr_books}
     tbr_books_copy = copy.deepcopy(tbr_books)
     semaphore = asyncio.Semaphore(5)
-    human_readable_name = target_attr.replace("_", " ").title()
 
     # Get books with the appropriate transform applied
     # Responsibility is on the callable here
-    enriched_books = await tqdm_asyncio.gather(
-        *[
-            get_book_callable(book, semaphore) for book in tbr_books_copy
-        ],
-        desc=f"Getting required {human_readable_name} info"
-    )
+    tasks = [
+        get_book_callable(book, semaphore) for book in tbr_books_copy
+    ]
+    if is_gui_env():
+        enriched_books = await asyncio.gather(*tasks)
+    else:
+        human_readable_name = target_attr.replace("_", " ").title()
+        enriched_books = await tqdm_asyncio.gather(
+            *tasks,
+            desc=f"Getting required {human_readable_name} info"
+        )
     for enriched_book in enriched_books:
         book = tbr_books_map[enriched_book.full_title_str]
         setattr(

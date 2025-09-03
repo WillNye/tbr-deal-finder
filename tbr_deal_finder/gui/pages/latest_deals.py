@@ -1,6 +1,4 @@
 import flet as ft
-import asyncio
-import threading
 from datetime import datetime, timedelta
 from typing import List
 
@@ -248,26 +246,22 @@ class LatestDealsPage(BaseBookPage):
         # Store the button reference for later re-enabling
         self.run_button = e.control
         
-        # Start the async operation in a thread
-        thread = threading.Thread(target=self._run_async_latest_deals)
-        thread.daemon = True
-        thread.start()
+        # Use Flet's proper async task runner instead of threading
+        self.app.page.run_task(self._run_async_latest_deals)
     
-    def _run_async_latest_deals(self):
-        """Run the async latest deals operation in a new event loop"""
+    async def _run_async_latest_deals(self):
+        """Run the async latest deals operation using Flet's async support"""
         # Set loading state
         self.is_loading = True
         self.progress_container.visible = True
         self.run_button.disabled = True
+        
+        # Update the page to show loading state
         self.app.page.update()
         
-        # Create a new event loop for this thread
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        
         try:
-            # Run the async operation
-            success = loop.run_until_complete(self.app.run_latest_deals())
+            # Run the async operation directly (no need for new event loop)
+            success = await self.app.run_latest_deals()
             
             if success:
                 # Update the run time and load new deals
@@ -286,28 +280,15 @@ class LatestDealsPage(BaseBookPage):
             self.progress_container.visible = False
             self.run_button.disabled = False
             self.check_last_run()  # Refresh the status
+            
+            # Update the page to reset loading state
+            self.app.page.update()
+            
             # Refresh all pages since latest deals affects data on other pages
             self.app.refresh_all_pages()
             # Force a full page rebuild to update header status and content
             self.app.update_content()
-    
-    def _cleanup_event_loop(self, loop):
-        """Properly cleanup the event loop and any pending tasks"""
-        try:
-            # Give any pending tasks a moment to complete
-            pending = asyncio.all_tasks(loop)
-            if pending:
-                # Cancel all pending tasks
-                for task in pending:
-                    task.cancel()
-                
-                # Wait for cancelled tasks to finish
-                if pending:
-                    loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
-        except Exception as e:
-            print(f"Error during event loop cleanup: {e}")
-        finally:
-            loop.close()
+
 
     def show_info_dialog(self, e):
         """Show information about the latest deals feature"""

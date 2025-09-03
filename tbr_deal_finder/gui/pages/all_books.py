@@ -1,8 +1,6 @@
 import logging
 
 import flet as ft
-import asyncio
-import threading
 
 from tbr_deal_finder.book import Book, BookFormat
 from tbr_deal_finder.tracked_books import get_tbr_books
@@ -35,54 +33,25 @@ class AllBooksPage(BaseBookPage):
             self.filtered_items = []
             return
         
-        # Set loading state and run async operation in a thread
+        # Set loading state and use Flet's proper async task runner
         self.set_loading(True)
-        thread = threading.Thread(target=self._run_async_load)
-        thread.daemon = False  # Don't block app shutdown
-        thread.start()
+        self.app.page.run_task(self._async_load_items)
 
-    def _run_async_load(self):
-        """Run the async load operation in a new event loop"""
-        # Create a new event loop for this thread
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        
-        try:
-            # Run the async operation
-            loop.run_until_complete(self._async_load_items())
-        finally:
-            # Properly cleanup any pending tasks
-            self._cleanup_event_loop(loop)
-    
-    def _cleanup_event_loop(self, loop):
-        """Properly cleanup the event loop and any pending tasks"""
-        try:
-            # Give any pending tasks a moment to complete
-            pending = asyncio.all_tasks(loop)
-            if pending:
-                # Cancel all pending tasks
-                for task in pending:
-                    task.cancel()
-                
-                # Wait for cancelled tasks to finish
-                if pending:
-                    loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
-        except Exception as e:
-            logger.error(f"Error during event loop cleanup: {e}")
-        finally:
-            loop.close()
-    
     async def _async_load_items(self):
-        """Async method to load TBR books"""
+        """Load TBR books asynchronously using Flet's async support"""
         try:
+            # Run the async operation directly
             self.items = await get_tbr_books(self.app.config)
             self.apply_filters()
         except Exception as e:
+            logger.error(f"Error loading TBR books: {e}")
             self.items = []
             self.filtered_items = []
-            logger.error(f"Error loading books: {e}")
         finally:
             self.set_loading(False)
+            # Update the page to reflect the loaded data
+            self.app.page.update()
+
 
     def filter_by_format(self, items, format_filter: str):
         """Custom format filter that includes 'Either Format' option"""
