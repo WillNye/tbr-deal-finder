@@ -31,7 +31,7 @@ BUILD_SCRIPT := scripts/packaging/build_cross_platform.py
 # Build self-signed macOS DMG (recommended)
 build-mac:
 	@echo "🍎 Building app"
-# 	uv run flet build macos --output ${DIST_DIR}/app/
+	uv run flet build macos --output ${DIST_DIR}/app/
 	@echo ""
 	@echo "📦 Creating self-signed macOS DMG for app"
 	bash scripts/packaging/create_dmg.sh
