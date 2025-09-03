@@ -57,17 +57,4 @@ jobs:
           gui_dist/TBRDealFinder.dmg \
           --clobber \
           --repo ${{ github.repository }}
-        
-    - name: Update Release Description
-      uses: actions/github-script@v7
-      with:
-        script: |
-          const { data: release } = await github.rest.repos.getRelease({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            release_id: context.payload.release.id
-          });
-          
-          const dmgSize = "${{ steps.dmg-info.outputs.size }}";
-          const downloadSection = `
 

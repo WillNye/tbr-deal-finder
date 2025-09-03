@@ -116,6 +116,7 @@ def build_with_pyinstaller():
         "--hidden-import", "flet",
         "--hidden-import", "flet.web", 
         "--hidden-import", "flet.core",
+        "--hidden-import", "flet_desktop",
         "--hidden-import", "plotly",
         "--distpath", "gui_dist",
         "--clean",  # Clean previous builds
@@ -173,28 +174,76 @@ def sign_macos_app():
     print("🔐 Signing macOS app bundle with ad-hoc signing...")
     
     try:
-        # Sign all frameworks and libraries first
-        for item in app_path.rglob("*"):
-            if item.is_file() and (item.suffix in ['.dylib', '.so'] or 'framework' in str(item)):
-                subprocess.run([
-                    "codesign", "--force", "--sign", SIGNING_IDENTITY,
-                    "--timestamp", str(item)
-                ], check=True, capture_output=True)
-        
-        # Sign the main app bundle
+        # First, remove any existing signatures that might conflict
         subprocess.run([
-            "codesign", "--force", "--verify", "--verbose",
-            "--sign", SIGNING_IDENTITY,
-            "--timestamp",
-            "--options", "runtime",
+            "codesign", "--remove-signature", "--deep", str(app_path)
+        ], check=False, capture_output=True)  # Don't fail if no signature exists
+        
+        # Sign all frameworks and libraries first (ad-hoc signing doesn't use timestamps)
+        frameworks_dir = app_path / "Contents" / "Frameworks"
+        if frameworks_dir.exists():
+            for item in frameworks_dir.rglob("*"):
+                if item.is_file() and (item.suffix in ['.dylib', '.so'] or 'framework' in str(item).lower()):
+                    subprocess.run([
+                        "codesign", "--force", "--sign", SIGNING_IDENTITY, str(item)
+                    ], check=True, capture_output=True)
+        
+        # Sign all internal binaries
+        internal_dir = app_path / "Contents" / "MacOS"
+        if internal_dir.exists():
+            for item in internal_dir.rglob("*"):
+                if item.is_file() and item != internal_dir / f"{PROJECT_NAME.replace(' ', '')}":
+                    subprocess.run([
+                        "codesign", "--force", "--sign", SIGNING_IDENTITY, str(item)
+                    ], check=False, capture_output=True)  # Don't fail on non-binary files
+        
+        # Create entitlements file for library validation bypass
+        entitlements_path = Path("entitlements.plist")
+        entitlements_content = '''<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>com.apple.security.cs.allow-dyld-environment-variables</key>
+    <true/>
+    <key>com.apple.security.cs.disable-library-validation</key>
+    <true/>
+</dict>
+</plist>'''
+        entitlements_path.write_text(entitlements_content)
+        
+        # Sign the main executable with entitlements
+        main_executable = app_path / "Contents" / "MacOS" / f"{PROJECT_NAME.replace(' ', '')}"
+        subprocess.run([
+            "codesign", "--force", "--sign", SIGNING_IDENTITY,
+            "--entitlements", str(entitlements_path),
+            str(main_executable)
+        ], check=True)
+        
+        # Finally, sign the main app bundle with entitlements
+        subprocess.run([
+            "codesign", "--force", "--sign", SIGNING_IDENTITY,
+            "--entitlements", str(entitlements_path),
             str(app_path)
         ], check=True)
+        
+        # Clean up entitlements file
+        entitlements_path.unlink()
         
         print("✅ macOS app bundle signed successfully (ad-hoc)")
         return True
     except subprocess.CalledProcessError as e:
         print(f"❌ macOS app bundle signing failed: {e}")
-        return False
+        # Try a simpler signing approach as fallback
+        try:
+            print("🔄 Trying simpler signing approach...")
+            subprocess.run([
+                "codesign", "--force", "--deep", "--sign", SIGNING_IDENTITY, str(app_path)
+            ], check=True)
+            print("✅ macOS app bundle signed with simpler approach")
+            return True
+        except subprocess.CalledProcessError as e2:
+            print(f"❌ Fallback signing also failed: {e2}")
+            return False
 
 
 def sign_windows_exe():
@@ -356,10 +405,10 @@ def sign_macos_dmg():
     print("🔐 Signing macOS DMG...")
     
     try:
+        # Ad-hoc signing doesn't support timestamps, so don't use --timestamp
         subprocess.run([
             "codesign", "--force", "--verify", "--verbose",
             "--sign", SIGNING_IDENTITY,
-            "--timestamp",
             str(dmg_path)
         ], check=True)
         
