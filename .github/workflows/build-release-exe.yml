@@ -91,7 +91,7 @@ jobs:
         
         # Use flet to build Windows executable
         Write-Output "🪟 Building Windows executable..."
-        uv run flet build windows --output gui_dist/ --verbose
+        uv run flet build windows --output gui_dist/
         
         Write-Output "📁 Build output contents:"
         Get-ChildItem -Path gui_dist -Recurse | Format-Table Name, Length, LastWriteTime

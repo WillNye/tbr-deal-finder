@@ -27,7 +27,8 @@ def build_book_price_section(historical_data: list[dict]) -> ft.Column:
     min_price = None
     max_price = None
     min_time = None
-    max_time = None
+    max_dt = datetime.now()
+    max_time = max_dt.timestamp()
 
     for record in historical_data:
         if record["retailer"] not in retailer_data:
@@ -65,21 +66,20 @@ def build_book_price_section(historical_data: list[dict]) -> ft.Column:
         # Track time range
         if not min_time or timestamp < min_time:
             min_time = timestamp
-        if not max_time or timestamp > max_time:
-            max_time = timestamp
 
     # Add hover padding to current date
     for retailer, data in retailer_data.items():
         last_update = data["last_update"]
-        cur_time = datetime.now()
         max_update_marker = last_update["timepoint"] + timedelta(days=1)
         last_price = last_update["current_price"]
         pad_tooltip = f"{retailer}: {float_to_currency(last_price)}"
         # Padding to show more consistent info on graph hover
-        while cur_time > max_update_marker:
+        while max_dt > (max_update_marker + timedelta(hours=6)):
+            max_update_marker_ts = max_update_marker.timestamp()
             data["data"].append(
-                ft.LineChartDataPoint(max_update_marker.timestamp(), last_price, tooltip=pad_tooltip)
+                ft.LineChartDataPoint(max_update_marker_ts, last_price, tooltip=pad_tooltip)
             )
+            data["last_update"]["timepoint"] = max_update_marker
 
             max_update_marker = max_update_marker + timedelta(days=1)
 
@@ -95,8 +95,6 @@ def build_book_price_section(historical_data: list[dict]) -> ft.Column:
         data["data"].append(
             ft.LineChartDataPoint(max_time, last_price, tooltip=pad_tooltip)
         )
-
-
 
     # Y-axis setup
     y_min = min_price // 5 * 5  # Keep as float
