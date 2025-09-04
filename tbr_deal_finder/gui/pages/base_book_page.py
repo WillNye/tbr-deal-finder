@@ -91,6 +91,7 @@ class BaseBookPage(ABC):
             label="Search...",
             prefix_icon=ft.Icons.SEARCH,
             on_change=self.on_search_change,
+            value=self.search_query,
             expand=True
         )
         
