@@ -30,6 +30,37 @@ jobs:
       run: |
         uv sync
 
+    - name: Set up Windows SDK (for SignTool)
+      uses: microsoft/setup-msbuild@v2
+      
+    - name: Find and configure SignTool
+      run: |
+        # Find signtool.exe in Windows SDK
+        $signtoolPaths = @(
+          "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe",
+          "${env:ProgramFiles}\Windows Kits\10\bin\*\x64\signtool.exe",
+          "${env:ProgramFiles(x86)}\Microsoft SDKs\Windows\*\bin\*\signtool.exe"
+        )
+        
+        $signtoolPath = $null
+        foreach ($path in $signtoolPaths) {
+          $found = Get-ChildItem -Path $path -ErrorAction SilentlyContinue | Select-Object -First 1
+          if ($found) {
+            $signtoolPath = $found.FullName
+            break
+          }
+        }
+        
+        if ($signtoolPath) {
+          Write-Output "✅ Found SignTool at: $signtoolPath"
+          $signtoolDir = Split-Path -Parent $signtoolPath
+          Write-Output "SIGNTOOL_PATH=$signtoolPath" >> $env:GITHUB_ENV
+          Write-Output "SIGNTOOL_DIR=$signtoolDir" >> $env:GITHUB_ENV
+          Write-Output "$signtoolDir" >> $env:GITHUB_PATH
+        } else {
+          Write-Output "❌ SignTool not found, code signing will be skipped"
+        }
+
     - name: Import Code Signing Certificate (if available)
       if: ${{ env.HAS_WINDOWS_CERTIFICATE == 'true' && env.HAS_WINDOWS_CERTIFICATE_PASSWORD == 'true' }}
       run: |
@@ -65,8 +96,8 @@ jobs:
         Write-Output "📁 Build output contents:"
         Get-ChildItem -Path gui_dist -Recurse | Format-Table Name, Length, LastWriteTime
         
-    - name: Sign Windows EXE (if certificate available)
-      if: ${{ env.HAS_WINDOWS_CERTIFICATE == 'true' && env.HAS_WINDOWS_CERTIFICATE_PASSWORD == 'true' }}
+    - name: Sign Windows EXE (if certificate and SignTool available)
+      if: ${{ env.HAS_WINDOWS_CERTIFICATE == 'true' && env.HAS_WINDOWS_CERTIFICATE_PASSWORD == 'true' && env.SIGNTOOL_PATH != '' }}
       run: |
         # Find the executable
         $exePath = Get-ChildItem -Path "gui_dist" -Filter "*.exe" -Recurse | Select-Object -First 1
@@ -76,17 +107,32 @@ jobs:
         }
         
         Write-Output "🔐 Signing Windows executable: $($exePath.FullName)"
+        Write-Output "📍 Using SignTool: $env:SIGNTOOL_PATH"
         
-        # Sign with self-signed certificate
+        # Sign with self-signed certificate using full path
         try {
-          & signtool sign /n "TBR Deal Finder" /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 $exePath.FullName
+          & "$env:SIGNTOOL_PATH" sign /n "TBR Deal Finder" /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 $exePath.FullName
           Write-Output "✅ Windows executable signed successfully"
         }
         catch {
-          Write-Output "⚠️  Signing failed, trying alternative method..."
-          & signtool sign /s My /n "TBR Deal Finder" /fd SHA256 $exePath.FullName
-          Write-Output "✅ Windows executable signed successfully (alternative method)"
+          Write-Output "⚠️  Timestamped signing failed, trying without timestamp..."
+          try {
+            & "$env:SIGNTOOL_PATH" sign /s My /n "TBR Deal Finder" /fd SHA256 $exePath.FullName
+            Write-Output "✅ Windows executable signed successfully (without timestamp)"
+          }
+          catch {
+            Write-Output "❌ Both signing methods failed"
+            Write-Output "Certificate store contents:"
+            Get-ChildItem -Path Cert:\CurrentUser\My | Where-Object {$_.Subject -like "*TBR Deal Finder*"} | Format-List Subject, Thumbprint, NotAfter
+            throw "Code signing failed"
+          }
         }
+        
+    - name: Skip signing message (if SignTool not available)
+      if: ${{ env.HAS_WINDOWS_CERTIFICATE == 'true' && env.HAS_WINDOWS_CERTIFICATE_PASSWORD == 'true' && env.SIGNTOOL_PATH == '' }}
+      run: |
+        Write-Output "⚠️  SignTool not found - executable will not be signed"
+        Write-Output "   The executable will still work but may show security warnings"
         
     - name: Find and verify EXE was created
       id: find-exe
