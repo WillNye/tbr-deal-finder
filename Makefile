@@ -40,26 +40,7 @@ build-mac:
 # Build Windows EXE (requires Windows or GitHub Actions)
 build-windows:
 	@echo "🪟 Building Windows EXE..."
-	@if [ "$(shell uname -s)" = "MINGW32_NT" ] || [ "$(shell uname -s)" = "MINGW64_NT" ] || [ "$(shell uname -s)" = "CYGWIN_NT" ] || [ "$(shell echo $(OS))" = "Windows_NT" ]; then \
-		echo "🪟 Building Windows EXE natively..."; \
-		uv run python $(BUILD_SCRIPT); \
-		echo "✅ Windows EXE built successfully!"; \
-		echo "📦 Output: $(DIST_DIR)/TBRDealFinder.exe"; \
-	else \
-		echo "❌ Windows builds require a Windows environment"; \
-		echo ""; \
-		echo "💡 Recommended approach for Windows .exe:"; \
-		echo "   🤖 Use GitHub Actions (reliable & automatic)"; \
-		echo "      git tag v1.0.0"; \
-		echo "      git push origin v1.0.0"; \
-		echo ""; \
-		echo "   📁 GitHub Actions workflow already configured:"; \
-		echo "      .github/workflows/build-windows.yml"; \
-		echo ""; \
-		echo "   🖥️  Or build on actual Windows machine"; \
-		echo "      Same command: make build-windows"; \
-		exit 1; \
-	fi
+	uv run flet build macos --output ${DIST_DIR}/app/
 
 # Test macOS DMG
 test-mac:

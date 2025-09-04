@@ -2,7 +2,7 @@ name: Build and Attach DMG to Release
 
 on:
   release:
-    types: [created, edited]
+    types: [edited]  # [created]
 
 permissions:
   contents: write

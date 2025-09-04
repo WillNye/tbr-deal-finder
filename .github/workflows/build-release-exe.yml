@@ -1,0 +1,124 @@
+name: Build and Attach Windows EXE to Release
+
+on:
+  release:
+    types: [created]
+
+permissions:
+  contents: write
+  
+jobs:
+  build-exe:
+    runs-on: windows-latest
+    env:
+      HAS_WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE != '' }}
+      HAS_WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD != '' }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+        
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.13'
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v5
+        
+    - name: Install project dependencies
+      run: |
+        uv sync
+
+    - name: Import Code Signing Certificate (if available)
+      if: ${{ env.HAS_WINDOWS_CERTIFICATE == 'true' && env.HAS_WINDOWS_CERTIFICATE_PASSWORD == 'true' }}
+      run: |
+        # Decode and import certificate
+        $certBytes = [System.Convert]::FromBase64String("${{ secrets.WINDOWS_CERTIFICATE }}")
+        $certPath = "windows-cert.pfx"
+        [System.IO.File]::WriteAllBytes($certPath, $certBytes)
+        
+        # Import certificate to certificate store
+        $securePassword = ConvertTo-SecureString -String "${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}" -Force -AsPlainText
+        Import-PfxCertificate -FilePath $certPath -CertStoreLocation Cert:\CurrentUser\My -Password $securePassword
+        
+        Write-Output "✅ Code signing certificate imported successfully"
+        
+        # Clean up certificate file
+        Remove-Item $certPath -Force
+        
+    - name: Build Windows EXE
+      run: |
+        # Use flet to build Windows executable
+        uv run flet build windows --output gui_dist/
+        
+    - name: Sign Windows EXE (if certificate available)
+      if: ${{ env.HAS_WINDOWS_CERTIFICATE == 'true' && env.HAS_WINDOWS_CERTIFICATE_PASSWORD == 'true' }}
+      run: |
+        # Find the executable
+        $exePath = Get-ChildItem -Path "gui_dist" -Filter "*.exe" -Recurse | Select-Object -First 1
+        if (-not $exePath) {
+          Write-Output "❌ No executable found in gui_dist/"
+          exit 1
+        }
+        
+        Write-Output "🔐 Signing Windows executable: $($exePath.FullName)"
+        
+        # Sign with self-signed certificate
+        try {
+          & signtool sign /n "TBR Deal Finder" /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 $exePath.FullName
+          Write-Output "✅ Windows executable signed successfully"
+        }
+        catch {
+          Write-Output "⚠️  Signing failed, trying alternative method..."
+          & signtool sign /s My /n "TBR Deal Finder" /fd SHA256 $exePath.FullName
+          Write-Output "✅ Windows executable signed successfully (alternative method)"
+        }
+        
+    - name: Find and verify EXE was created
+      id: find-exe
+      run: |
+        $exeFile = Get-ChildItem -Path "gui_dist" -Filter "*.exe" -Recurse | Select-Object -First 1
+        if (-not $exeFile) {
+          Write-Output "❌ EXE file not found!"
+          Write-Output "Contents of gui_dist/:"
+          Get-ChildItem -Path "gui_dist" -Recurse | Format-Table
+          exit 1
+        }
+        
+        Write-Output "✅ EXE file created successfully: $($exeFile.FullName)"
+        Write-Output "exe_path=$($exeFile.FullName)" >> $env:GITHUB_OUTPUT
+        Write-Output "exe_name=$($exeFile.Name)" >> $env:GITHUB_OUTPUT
+        
+    - name: Get EXE info
+      id: exe-info
+      run: |
+        $exePath = "${{ steps.find-exe.outputs.exe_path }}"
+        $exeSize = [math]::Round((Get-Item $exePath).Length / 1MB, 1)
+        Write-Output "size=$($exeSize)MB" >> $env:GITHUB_OUTPUT
+        Write-Output "📦 EXE Size: $($exeSize)MB"
+        Write-Output "📦 EXE Name: ${{ steps.find-exe.outputs.exe_name }}"
+        
+        # Check if signed
+        try {
+          $signature = Get-AuthenticodeSignature -FilePath $exePath
+          if ($signature.Status -eq "Valid") {
+            Write-Output "✅ Executable is properly signed"
+          } elseif ($signature.Status -eq "UnknownError") {
+            Write-Output "⚠️  Executable is self-signed (users will see security warnings)"
+          } else {
+            Write-Output "ℹ️  Executable signature status: $($signature.Status)"
+          }
+        }
+        catch {
+          Write-Output "ℹ️  Could not verify signature"
+        }
+        
+    - name: Upload EXE to Release
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        gh release upload ${{ github.event.release.tag_name }} `
+          "${{ steps.find-exe.outputs.exe_path }}" `
+          --clobber `
+          --repo ${{ github.repository }}
