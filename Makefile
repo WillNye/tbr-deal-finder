@@ -40,7 +40,7 @@ build-mac:
 # Build Windows EXE (requires Windows or GitHub Actions)
 build-windows:
 	@echo "🪟 Building Windows EXE..."
-	uv run flet build macos --output ${DIST_DIR}/app/
+	uv run flet build windows --output ${DIST_DIR}/app/
 
 # Test macOS DMG
 test-mac:

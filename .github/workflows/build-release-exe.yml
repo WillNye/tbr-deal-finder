@@ -48,9 +48,22 @@ jobs:
         Remove-Item $certPath -Force
         
     - name: Build Windows EXE
+      env:
+        PYTHONIOENCODING: utf-8
+        PYTHONLEGACYWINDOWSFSENCODING: utf-8
+        # Disable Rich progress bars to avoid Unicode issues
+        TERM: dumb
+        NO_COLOR: 1
       run: |
+        # Set console to UTF-8 to handle Unicode characters
+        chcp 65001
+        
         # Use flet to build Windows executable
-        uv run flet build windows --output gui_dist/
+        Write-Output "🪟 Building Windows executable..."
+        uv run flet build windows --output gui_dist/ --verbose
+        
+        Write-Output "📁 Build output contents:"
+        Get-ChildItem -Path gui_dist -Recurse | Format-Table Name, Length, LastWriteTime
         
     - name: Sign Windows EXE (if certificate available)
       if: ${{ env.HAS_WINDOWS_CERTIFICATE == 'true' && env.HAS_WINDOWS_CERTIFICATE_PASSWORD == 'true' }}
