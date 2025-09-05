@@ -1,5 +1,6 @@
 import asyncio
 import os
+import base64
 
 import flet as ft
 
@@ -35,6 +36,7 @@ class TBRDealFinderApp:
         self.setup_page()
         self.load_config()
         self.build_layout()
+        self.check_for_updates_silently()
 
     def setup_page(self):
         """Configure the main page settings"""
@@ -54,6 +56,74 @@ class TBRDealFinderApp:
         except FileNotFoundError:
             # Will prompt for config setup
             self.config = None
+    
+    def load_logo_as_base64(self):
+        """Load the logo image and convert to base64"""
+        try:
+            # Get the path relative to the main script location
+            logo_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets", "icon.png")
+            if not os.path.exists(logo_path):
+                # Try alternative path for packaged app
+                logo_path = os.path.join("assets", "icon.png")
+            
+            if os.path.exists(logo_path):
+                with open(logo_path, "rb") as image_file:
+                    encoded_string = base64.b64encode(image_file.read()).decode()
+                    return encoded_string  # Return just the base64 string, not the data URL
+        except Exception as e:
+            print(f"Could not load logo: {e}")
+        return None
+
+    def refresh_navigation(self):
+        """Refresh the navigation container to update the update indicator"""
+        # Rebuild just the navigation part
+        logo_base64 = self.load_logo_as_base64()
+        
+        # Create logo widget or fallback
+        if logo_base64:
+            logo_widget = ft.Image(
+                src_base64=logo_base64,
+                width=80,
+                height=80,
+                fit=ft.ImageFit.CONTAIN
+            )
+        else:
+            logo_widget = ft.Icon(
+                ft.Icons.BOOK,
+                size=64,
+                color=ft.Colors.BLUE_400
+            )
+        
+        # Create bottom section with logo and update indicator
+        bottom_section_widgets = [logo_widget]
+        
+        # Add update indicator if update is available
+        if self.update_info:
+            update_indicator = ft.Container(
+                content=ft.Text(
+                    "Update Available",
+                    size=11,
+                    color=ft.Colors.ORANGE_400,
+                    weight=ft.FontWeight.BOLD,
+                    text_align=ft.TextAlign.CENTER
+                ),
+                padding=ft.padding.only(top=8, left=4, right=4, bottom=4),
+                alignment=ft.alignment.center,
+                on_click=lambda e: self.show_update_notification(),
+                border_radius=4,
+                bgcolor=ft.Colors.ORANGE_50,
+                border=ft.border.all(1, ft.Colors.ORANGE_400)
+            )
+            bottom_section_widgets.append(update_indicator)
+        
+        # Update the bottom container content
+        self.nav_container.content.controls[1].content = ft.Column(
+            bottom_section_widgets,
+            horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+            spacing=0
+        )
+        
+        self.page.update()
 
     def build_layout(self):
         """Build the main application layout"""
@@ -71,8 +141,27 @@ class TBRDealFinderApp:
             ]
         )
 
+        # Load logo as base64
+        logo_base64 = self.load_logo_as_base64()
+        
+        # Create logo widget or fallback
+        if logo_base64:
+            logo_widget = ft.Image(
+                src_base64=logo_base64,
+                width=80,
+                height=80,
+                fit=ft.ImageFit.CONTAIN
+            )
+        else:
+            # Fallback to an icon if logo can't be loaded
+            logo_widget = ft.Icon(
+                ft.Icons.BOOK,
+                size=64,
+                color=ft.Colors.BLUE_400
+            )
+        
         # Navigation rail (left sidebar)
-        self.nav_rail = ft.NavigationRail(
+        nav_rail = ft.NavigationRail(
             selected_index=0,
             label_type=ft.NavigationRailLabelType.ALL,
             min_width=200,
@@ -91,11 +180,56 @@ class TBRDealFinderApp:
                 ),
                 ft.NavigationRailDestination(
                     icon=ft.Icons.LIBRARY_BOOKS,
-                    selected_icon=ft.Icons.LIBRARY_BOOKS_OUTLINED,
+                    selected_icon=ft.Icons.LOCAL_LIBRARY_OUTLINED,
                     label="My Books"
                 ),
             ],
-            on_change=self.nav_changed
+            on_change=self.nav_changed,
+            expand=True  # This allows NavigationRail to expand within the Column
+        )
+        
+        # Store reference for later use
+        self.nav_rail = nav_rail
+        
+        # Create bottom section with logo and update indicator
+        bottom_section_widgets = [logo_widget]
+        
+        # Add update indicator if update is available
+        if self.update_info:
+            update_indicator = ft.Container(
+                content=ft.Text(
+                    "Update Available",
+                    size=11,
+                    color=ft.Colors.ORANGE_400,
+                    weight=ft.FontWeight.BOLD,
+                    text_align=ft.TextAlign.CENTER
+                ),
+                padding=ft.padding.only(top=8, left=4, right=4, bottom=4),
+                alignment=ft.alignment.center,
+                on_click=lambda e: self.show_update_notification(),
+                border_radius=4,
+                bgcolor=ft.Colors.ORANGE_50,
+                border=ft.border.all(1, ft.Colors.ORANGE_400)
+            )
+            bottom_section_widgets.append(update_indicator)
+        
+        # Create navigation container with logo at bottom
+        self.nav_container = ft.Container(
+            content=ft.Column([
+                nav_rail,
+                ft.Container(
+                    content=ft.Column(
+                        bottom_section_widgets,
+                        horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                        spacing=0
+                    ),
+                    padding=ft.padding.only(bottom=20),
+                    alignment=ft.alignment.center
+                )
+            ], 
+            spacing=0,
+            expand=True),  # Column should expand vertically
+            width=200  # Fixed width, no horizontal expand
         )
 
         # Main content area
@@ -108,7 +242,7 @@ class TBRDealFinderApp:
         # Main layout with sidebar and content
         main_layout = ft.Row(
             [
-                self.nav_rail,
+                self.nav_container,
                 ft.VerticalDivider(width=1),
                 self.content_area
             ],
@@ -416,6 +550,21 @@ class TBRDealFinderApp:
 
         return result
 
+    def check_for_updates_silently(self):
+        """Check for updates silently without showing dialogs - only update the indicator"""
+        try:
+            update_info = check_for_desktop_updates()
+            
+            if update_info:
+                self.update_info = update_info
+            else:
+                self.update_info = None
+                
+            self.refresh_navigation()  # Update the navigation indicator
+        except Exception as e:
+            # Silently fail - don't show errors for automatic update checks
+            print(f"Silent update check failed: {e}")
+
     def check_for_updates_manual(self):
         """Check for updates manually when user clicks button."""
         
@@ -425,9 +574,13 @@ class TBRDealFinderApp:
         if update_info:
             # Update available - show banner
             self.update_info = update_info
+            self.refresh_navigation()  # Update the navigation to show indicator
             self.show_update_notification()
         else:
             # No update available - show up-to-date message
+            # Clear any existing update info and refresh navigation
+            self.update_info = None
+            self.refresh_navigation()  # Update the navigation to hide indicator
             self.show_up_to_date_message()
 
     def show_update_notification(self):

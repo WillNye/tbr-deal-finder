@@ -30,8 +30,16 @@ jobs:
       run: |
         uv sync
 
-    - name: Set up Windows SDK (for SignTool)
+    - name: Set up Visual Studio Build Tools (for Flet)
       uses: microsoft/setup-msbuild@v2
+      with:
+        msbuild-architecture: x64
+        
+    - name: Install Visual C++ Build Tools
+      run: |
+        # Install Visual C++ Redistributable and build tools needed for Flet
+        choco install visualcppbuildtools -y
+        choco install vcredist-all -y
       
     - name: Find and configure SignTool
       run: |
@@ -85,16 +93,60 @@ jobs:
         # Disable Rich progress bars to avoid Unicode issues
         TERM: dumb
         NO_COLOR: 1
+        # Ensure Python runtime is bundled
+        FLET_BUILD_VERBOSE: 1
       run: |
         # Set console to UTF-8 to handle Unicode characters
         chcp 65001
         
-        # Use flet to build Windows executable
+        # Use flet to build Windows executable with verbose output
         Write-Output "🪟 Building Windows executable..."
-        uv run flet build windows --output gui_dist/
+        uv run flet build windows --output gui_dist/ --verbose --include-packages flet,flet_desktop
         
         Write-Output "📁 Build output contents:"
         Get-ChildItem -Path gui_dist -Recurse | Format-Table Name, Length, LastWriteTime
+        
+        # Check if critical Python runtime DLLs are present
+        Write-Output "🔍 Checking for Python runtime DLLs..."
+        $exeDir = (Get-ChildItem -Path "gui_dist" -Filter "*.exe" -Recurse | Select-Object -First 1).Directory.FullName
+        if ($exeDir) {
+          Write-Output "EXE Directory: $exeDir"
+          
+          $pythonDlls = @("python*.dll", "*python*.dll", "serious_python*.dll")
+          $missingDlls = @()
+          
+          foreach ($pattern in $pythonDlls) {
+            $found = Get-ChildItem -Path $exeDir -Filter $pattern -Recurse -ErrorAction SilentlyContinue
+            if ($found) {
+              Write-Output "✅ Found: $($found.Name) in $($found.DirectoryName)"
+            } else {
+              $missingDlls += $pattern
+            }
+          }
+          
+          # If serious_python DLL is missing, try to find and copy it from Python installation
+          if ($missingDlls -contains "serious_python*.dll") {
+            Write-Output "⚠️  serious_python DLL missing, attempting to locate and copy..."
+            
+            # Check common Python locations
+            $pythonPaths = @(
+              "$env:HOSTEDTOOLCACHE\Python\*\*\DLLs",
+              "$env:PYTHON_HOME\DLLs",
+              "C:\Python*\DLLs",
+              "C:\hostedtoolcache\windows\Python\*\*\DLLs"
+            )
+            
+            foreach ($pythonPath in $pythonPaths) {
+              $foundDll = Get-ChildItem -Path $pythonPath -Filter "serious_python*.dll" -ErrorAction SilentlyContinue
+              if ($foundDll) {
+                Write-Output "📦 Found DLL at: $($foundDll.FullName)"
+                Copy-Item -Path $foundDll.FullName -Destination $exeDir -Force
+                Write-Output "✅ Copied serious_python DLL to executable directory"
+                break
+              }
+            }
+          }
+        }
         
     - name: Sign Windows EXE (if certificate and SignTool available)
       if: ${{ env.HAS_WINDOWS_CERTIFICATE == 'true' && env.HAS_WINDOWS_CERTIFICATE_PASSWORD == 'true' && env.SIGNTOOL_PATH != '' }}
