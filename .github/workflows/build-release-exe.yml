@@ -126,7 +126,7 @@ jobs:
         AllowNoIcons=yes
         OutputDir=.
         OutputBaseFilename=${{ steps.app-info.outputs.app_name }}-${{ steps.app-info.outputs.app_version }}-Setup
-        SetupIconFile=gui_dist\${{ steps.app-info.outputs.exe_name }}
+        SetupIconFile=assets\icon.ico
         Compression=lzma
         SolidCompression=yes
         WizardStyle=modern
