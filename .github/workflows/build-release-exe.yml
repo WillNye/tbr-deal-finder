@@ -64,8 +64,6 @@ jobs:
         TERM: dumb
         NO_COLOR: 1
       run: |
-        flutter config --no-analytics
-        
         # Set console to UTF-8 to handle Unicode characters
         chcp 65001
         
@@ -90,50 +88,90 @@ jobs:
         folder: 'gui_dist'
         recursive: true
         
-    - name: Find and verify EXE was created
-      id: find-exe
+    - name: Get App Info
+      id: app-info
       run: |
-        $exeFile = Get-ChildItem -Path "gui_dist" -Filter "*.exe" -Recurse | Select-Object -First 1
+        # Find the EXE file
+        $exeFile = Get-ChildItem -Path "gui_dist" -Filter "*.exe" | Select-Object -First 1
         if (-not $exeFile) {
           Write-Output "❌ EXE file not found!"
-          Write-Output "Contents of gui_dist/:"
-          Get-ChildItem -Path "gui_dist" -Recurse | Format-Table
           exit 1
         }
         
-        Write-Output "✅ EXE file created successfully: $($exeFile.FullName)"
-        Write-Output "exe_path=$($exeFile.FullName)" >> $env:GITHUB_OUTPUT
+        $appName = [System.IO.Path]::GetFileNameWithoutExtension($exeFile.Name)
+        $appVersion = "${{ github.event.release.tag_name }}".TrimStart('v')
+        
+        # Default to 1.0.0 if tag isn't semver
+        if (-not ($appVersion -match '^\d+\.\d+\.\d+')) {
+          $appVersion = "1.0.0"
+        }
+        
+        Write-Output "app_name=$appName" >> $env:GITHUB_OUTPUT
+        Write-Output "app_version=$appVersion" >> $env:GITHUB_OUTPUT
         Write-Output "exe_name=$($exeFile.Name)" >> $env:GITHUB_OUTPUT
-        
-    - name: Get EXE info
-      id: exe-info
+
+    - name: Create InnoSetup Script
       run: |
-        $exePath = "${{ steps.find-exe.outputs.exe_path }}"
-        $exeSize = [math]::Round((Get-Item $exePath).Length / 1MB, 1)
-        Write-Output "size=$($exeSize)MB" >> $env:GITHUB_OUTPUT
-        Write-Output "📦 EXE Size: $($exeSize)MB"
-        Write-Output "📦 EXE Name: ${{ steps.find-exe.outputs.exe_name }}"
+        @"
+        [Setup]
+        AppId={{$(New-Guid)}}
+        AppName=${{ steps.app-info.outputs.app_name }}
+        AppVersion=${{ steps.app-info.outputs.app_version }}
+        AppPublisher=WillNye
+        AppPublisherURL=https://github.com/WillNye
+        AppSupportURL=https://github.com/WillNye/${{ github.event.repository.name }}/issues
+        AppUpdatesURL=https://github.com/WillNye/${{ github.event.repository.name }}/releases
+        DefaultDirName={autopf}\${{ steps.app-info.outputs.app_name }}
+        DefaultGroupName=${{ steps.app-info.outputs.app_name }}
+        AllowNoIcons=yes
+        OutputDir=.
+        OutputBaseFilename=${{ steps.app-info.outputs.app_name }}-${{ steps.app-info.outputs.app_version }}-Setup
+        SetupIconFile=gui_dist\${{ steps.app-info.outputs.exe_name }}
+        Compression=lzma
+        SolidCompression=yes
+        WizardStyle=modern
+        PrivilegesRequired=lowest
+        PrivilegesRequiredOverridesAllowed=dialog
         
-        # Check if signed
-        try {
-          $signature = Get-AuthenticodeSignature -FilePath $exePath
-          if ($signature.Status -eq "Valid") {
-            Write-Output "✅ Executable is properly signed"
-          } elseif ($signature.Status -eq "UnknownError") {
-            Write-Output "⚠️  Executable is self-signed (users will see security warnings)"
-          } else {
-            Write-Output "ℹ️  Executable signature status: $($signature.Status)"
-          }
-        }
-        catch {
-          Write-Output "ℹ️  Could not verify signature"
-        }
+        [Languages]
+        Name: "english"; MessagesFile: "compiler:Default.isl"
         
-    - name: Upload EXE to Release
+        [Tasks]
+        Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
+        
+        [Files]
+        Source: "gui_dist\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+        
+        [Icons]
+        Name: "{group}\${{ steps.app-info.outputs.app_name }}"; Filename: "{app}\${{ steps.app-info.outputs.exe_name }}"
+        Name: "{group}\{cm:UninstallProgram,${{ steps.app-info.outputs.app_name }}}"; Filename: "{uninstallexe}"
+        Name: "{autodesktop}\${{ steps.app-info.outputs.app_name }}"; Filename: "{app}\${{ steps.app-info.outputs.exe_name }}"; Tasks: desktopicon
+        
+        [Run]
+        Filename: "{app}\${{ steps.app-info.outputs.exe_name }}"; Description: "{cm:LaunchProgram,${{ steps.app-info.outputs.app_name }}}"; Flags: nowait postinstall skipifsilent
+        "@ | Out-File -FilePath "setup.iss" -Encoding UTF8
+
+    - name: Build Setup with InnoSetup
+      uses: Minionguyjpro/Inno-Setup-Action@v1.2.2
+      with:
+        path: setup.iss
+        options: /O+ /DLessMsg
+
+    - name: Sign Installer (if certificate available)
+      if: ${{ env.HAS_WINDOWS_CERTIFICATE == 'true' && env.HAS_WINDOWS_CERTIFICATE_PASSWORD == 'true' }}
+      uses: dlemstra/code-sign-action@v1
+      with:
+        certificate: '${{ secrets.WINDOWS_CERTIFICATE }}'
+        password: '${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}'
+        files: '${{ steps.app-info.outputs.app_name }}-${{ steps.app-info.outputs.app_version }}-Setup.exe'
+
+    - name: Upload Installer to Release
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
+        $installerFile = "${{ steps.app-info.outputs.app_name }}-${{ steps.app-info.outputs.app_version }}-Setup.exe"
+        
         gh release upload ${{ github.event.release.tag_name }} `
-          "${{ steps.find-exe.outputs.exe_path }}" `
+          $installerFile `
           --clobber `
           --repo ${{ github.repository }}
