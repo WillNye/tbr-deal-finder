@@ -13,20 +13,22 @@ jobs:
     env:
       HAS_WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE != '' }}
       HAS_WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD != '' }}
-    
+      APP_DISPLAY_NAME: "TBR Deal Finder"
+      APP_FILENAME_BASE: "TBR-Deal-Finder"
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-        
+
     - name: Set up Flutter
       uses: subosito/flutter-action@v2
       with:
         flutter-version: '3.29.2'
         channel: 'stable'
-        
+
     - name: Enable Windows Desktop
       run: flutter config --enable-windows-desktop
-      
+
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
@@ -34,7 +36,7 @@ jobs:
 
     - name: Install uv
       uses: astral-sh/setup-uv@v5
-        
+
     - name: Install project dependencies
       run: |
         uv sync
@@ -55,7 +57,7 @@ jobs:
         
         # Clean up certificate file
         Remove-Item $certPath -Force
-        
+
     - name: Build Windows EXE
       env:
         PYTHONIOENCODING: utf-8
@@ -78,7 +80,7 @@ jobs:
         
         Write-Output "📁 Build output contents:"
         Get-ChildItem -Path gui_dist -Recurse | Format-Table Name, Length, LastWriteTime
-        
+
     - name: Sign Windows EXE (if certificate available)
       if: ${{ env.HAS_WINDOWS_CERTIFICATE == 'true' && env.HAS_WINDOWS_CERTIFICATE_PASSWORD == 'true' }}
       uses: dlemstra/code-sign-action@v1
@@ -87,7 +89,7 @@ jobs:
         password: '${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}'
         folder: 'gui_dist'
         recursive: true
-        
+
     - name: Get App Info
       id: app-info
       run: |
@@ -98,7 +100,7 @@ jobs:
           exit 1
         }
         
-        $appName = [System.IO.Path]::GetFileNameWithoutExtension($exeFile.Name)
+        $exeName = [System.IO.Path]::GetFileNameWithoutExtension($exeFile.Name)
         $appVersion = "${{ github.event.release.tag_name }}".TrimStart('v')
         
         # Default to 1.0.0 if tag isn't semver
@@ -106,9 +108,9 @@ jobs:
           $appVersion = "1.0.0"
         }
         
-        Write-Output "app_name=$appName" >> $env:GITHUB_OUTPUT
-        Write-Output "app_version=$appVersion" >> $env:GITHUB_OUTPUT
         Write-Output "exe_name=$($exeFile.Name)" >> $env:GITHUB_OUTPUT
+        Write-Output "exe_base_name=$exeName" >> $env:GITHUB_OUTPUT
+        Write-Output "app_version=$appVersion" >> $env:GITHUB_OUTPUT
 
     - name: Install Inno Setup
       run: |
@@ -126,20 +128,20 @@ jobs:
         @"
         [Setup]
         AppId={{$(New-Guid)}}
-        AppName=${{ steps.app-info.outputs.app_name }}
+        AppName=${{ env.APP_DISPLAY_NAME }}
         AppVersion=${{ steps.app-info.outputs.app_version }}
         AppPublisher=WillNye
         AppPublisherURL=https://github.com/WillNye
         AppSupportURL=https://github.com/WillNye/${{ github.event.repository.name }}/issues
         AppUpdatesURL=https://github.com/WillNye/${{ github.event.repository.name }}/releases
-        DefaultDirName={autopf}\${{ steps.app-info.outputs.app_name }}
-        DefaultGroupName=${{ steps.app-info.outputs.app_name }}
+        DefaultDirName={autopf}\${{ env.APP_DISPLAY_NAME }}
+        DefaultGroupName=${{ env.APP_DISPLAY_NAME }}
         AllowNoIcons=yes
         OutputDir=.
-        OutputBaseFilename=${{ steps.app-info.outputs.app_name }}-${{ steps.app-info.outputs.app_version }}-Setup
+        OutputBaseFilename=${{ env.APP_FILENAME_BASE }}-${{ steps.app-info.outputs.app_version }}-Setup
         SetupIconFile=assets\icon.ico
-        Compression=lzma
-        SolidCompression=yes
+        Compression=lzma2/normal
+        SolidCompression=no
         WizardStyle=modern
         PrivilegesRequired=lowest
         PrivilegesRequiredOverridesAllowed=dialog
@@ -151,17 +153,19 @@ jobs:
         Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
         
         [Files]
-        Source: "gui_dist\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+        ; Exclude EXE from compression to preserve icon quality
+        Source: "gui_dist\${{ steps.app-info.outputs.exe_name }}"; DestDir: "{app}"; Flags: ignoreversion nocompression
+        ; Compress everything else
+        Source: "gui_dist\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "${{ steps.app-info.outputs.exe_name }}"
         
         [Icons]
-        Name: "{group}\${{ steps.app-info.outputs.app_name }}"; Filename: "{app}\${{ steps.app-info.outputs.exe_name }}"
-        Name: "{group}\{cm:UninstallProgram,${{ steps.app-info.outputs.app_name }}}"; Filename: "{uninstallexe}"
-        Name: "{autodesktop}\${{ steps.app-info.outputs.app_name }}"; Filename: "{app}\${{ steps.app-info.outputs.exe_name }}"; Tasks: desktopicon
+        Name: "{group}\${{ env.APP_DISPLAY_NAME }}"; Filename: "{app}\${{ steps.app-info.outputs.exe_name }}"
+        Name: "{group}\{cm:UninstallProgram,${{ env.APP_DISPLAY_NAME }}}"; Filename: "{uninstallexe}"
+        Name: "{autodesktop}\${{ env.APP_DISPLAY_NAME }}"; Filename: "{app}\${{ steps.app-info.outputs.exe_name }}"; Tasks: desktopicon
         
         [Run]
-        Filename: "{app}\${{ steps.app-info.outputs.exe_name }}"; Description: "{cm:LaunchProgram,${{ steps.app-info.outputs.app_name }}}"; Flags: nowait postinstall skipifsilent
+        Filename: "{app}\${{ steps.app-info.outputs.exe_name }}"; Description: "{cm:LaunchProgram,${{ env.APP_DISPLAY_NAME }}}"; Flags: nowait postinstall skipifsilent
         "@ | Out-File -FilePath "setup.iss" -Encoding UTF8
-
     - name: Build Setup with InnoSetup
       run: |
         # Compile the installer
@@ -180,13 +184,13 @@ jobs:
       with:
         certificate: '${{ secrets.WINDOWS_CERTIFICATE }}'
         password: '${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}'
-        files: '${{ steps.app-info.outputs.app_name }}-${{ steps.app-info.outputs.app_version }}-Setup.exe'
+        files: '${{ env.APP_FILENAME_BASE }}-${{ steps.app-info.outputs.app_version }}-Setup.exe'
 
     - name: Upload Installer to Release
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        $installerFile = "${{ steps.app-info.outputs.app_name }}-${{ steps.app-info.outputs.app_version }}-Setup.exe"
+        $installerFile = "${{ env.APP_FILENAME_BASE }}-${{ steps.app-info.outputs.app_version }}-Setup.exe"
         
         gh release upload ${{ github.event.release.tag_name }} `
           $installerFile `
