@@ -110,6 +110,17 @@ jobs:
         Write-Output "app_version=$appVersion" >> $env:GITHUB_OUTPUT
         Write-Output "exe_name=$($exeFile.Name)" >> $env:GITHUB_OUTPUT
 
+    - name: Install Inno Setup
+      run: |
+        # Download and install Inno Setup silently
+        Invoke-WebRequest -Uri "https://jrsoftware.org/download.php/is.exe" -OutFile "innosetup.exe"
+        Start-Process -FilePath ".\innosetup.exe" -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/SP-" -Wait
+        
+        # Add to PATH for current session
+        $env:PATH += ";C:\Program Files (x86)\Inno Setup 6"
+        
+        Write-Output "✅ Inno Setup installed successfully"
+
     - name: Create InnoSetup Script
       run: |
         @"
@@ -152,10 +163,16 @@ jobs:
         "@ | Out-File -FilePath "setup.iss" -Encoding UTF8
 
     - name: Build Setup with InnoSetup
-      uses: Minionguyjpro/Inno-Setup-Action@v1.2.2
-      with:
-        path: setup.iss
-        options: /O+ /DLessMsg
+      run: |
+        # Compile the installer
+        & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" setup.iss
+        
+        if ($LASTEXITCODE -ne 0) {
+          Write-Output "❌ InnoSetup compilation failed with exit code: $LASTEXITCODE"
+          exit 1
+        }
+        
+        Write-Output "✅ Installer created successfully"
 
     - name: Sign Installer (if certificate available)
       if: ${{ env.HAS_WINDOWS_CERTIFICATE == 'true' && env.HAS_WINDOWS_CERTIFICATE_PASSWORD == 'true' }}
