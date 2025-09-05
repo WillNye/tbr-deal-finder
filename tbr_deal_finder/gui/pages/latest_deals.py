@@ -9,7 +9,7 @@ from tbr_deal_finder.gui.pages.base_book_page import BaseBookPage
 
 class LatestDealsPage(BaseBookPage):
     def __init__(self, app):
-        super().__init__(app, 25)
+        super().__init__(app, 4)
         self.last_run_time = None
         
     def get_page_title(self) -> str:
@@ -115,6 +115,23 @@ class LatestDealsPage(BaseBookPage):
 
     def build_results(self):
         """Build the results section using base class pagination"""
+        # Items list container that we can update without rebuilding search controls
+        self.items_container = ft.Container()
+        self.pagination_container = ft.Container()
+        
+        # Initial build of items and pagination
+        self.update_items_display()
+        
+        return ft.Column([
+            self.items_container,
+            self.pagination_container
+        ], spacing=20)
+
+    def build_items_list(self):
+        """Override base class to handle format grouping with proper pagination"""
+        if self.is_loading:
+            return ft.Container()
+        
         if not self.filtered_items:
             main_msg, sub_msg = self.get_empty_state_message()
             return ft.Container(
@@ -127,9 +144,14 @@ class LatestDealsPage(BaseBookPage):
                 height=300
             )
         
-        # Group deals by format for better organization
-        ebooks = [deal for deal in self.filtered_items if deal.format == BookFormat.EBOOK]
-        audiobooks = [deal for deal in self.filtered_items if deal.format == BookFormat.AUDIOBOOK]
+        # Apply pagination to all filtered items
+        start_idx = self.current_page * self.items_per_page
+        end_idx = min(start_idx + self.items_per_page, len(self.filtered_items))
+        page_items = self.filtered_items[start_idx:end_idx]
+        
+        # Group page items by format for better organization
+        ebooks = [deal for deal in page_items if deal.format == BookFormat.EBOOK]
+        audiobooks = [deal for deal in page_items if deal.format == BookFormat.AUDIOBOOK]
         
         sections = []
         
@@ -139,23 +161,19 @@ class LatestDealsPage(BaseBookPage):
         if audiobooks:
             sections.append(self.build_format_section("Audiobook Deals", audiobooks))
         
-        if sections:
-            # Add pagination at the bottom
-            pagination = self.build_pagination()
-            sections.append(pagination)
+        if not sections:
+            return ft.Container()
         
-        return ft.Column(sections, spacing=20)
+        return ft.Container(
+            content=ft.Column(sections, spacing=20),
+            padding=10
+        )
 
     def build_format_section(self, title: str, deals: List[Book]):
-        """Build a section for a specific format"""
-        # Use pagination for the deals within this format
-        start_idx = self.current_page * self.items_per_page
-        end_idx = min(start_idx + self.items_per_page, len(deals))
-        page_deals = deals[start_idx:end_idx]
-        
+        """Build a section for a specific format (without pagination - that's handled at the page level)"""
         deals_tiles = []
         current_title_id = None
-        for deal in page_deals:
+        for deal in deals:
             # Add spacing between different books
             if current_title_id and current_title_id != deal.title_id:
                 deals_tiles.append(ft.Divider())

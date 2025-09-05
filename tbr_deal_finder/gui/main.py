@@ -6,6 +6,7 @@ import flet as ft
 
 from tbr_deal_finder.config import Config
 from tbr_deal_finder.book import Book, BookFormat
+from tbr_deal_finder.migrations import make_migrations
 from tbr_deal_finder.retailer import RETAILER_MAP
 from tbr_deal_finder.retailer.models import Retailer
 from tbr_deal_finder.retailer_deal import get_latest_deals
@@ -712,6 +713,7 @@ class TBRDealFinderApp:
 def main():
     """Main entry point for the GUI application"""
     os.environ.setdefault("ENTRYPOINT", "GUI")
+    make_migrations()
 
     def app_main(page: ft.Page):
         TBRDealFinderApp(page)

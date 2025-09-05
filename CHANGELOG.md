@@ -15,6 +15,7 @@ BUG FIXES:
 * Improvements to grouping titles in TBR 
 * Fixed issue where known books were being marked as unknown if not found on a run
 * Fixed bug where books not found were sometimes not added to Unknown books 
+* Fixed regression on Windows devices when adding Kindle support
 
 ---
 

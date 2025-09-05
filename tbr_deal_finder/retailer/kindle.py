@@ -1,6 +1,5 @@
 import asyncio
 import json
-import readline  # type: ignore
 from typing import Union
 
 from tbr_deal_finder.config import Config

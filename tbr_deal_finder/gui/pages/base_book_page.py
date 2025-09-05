@@ -57,7 +57,7 @@ class BaseBookPage(ABC):
                 ft.ProgressRing(),
                 ft.Text("Loading...", text_align=ft.TextAlign.CENTER),
                 ft.Text(
-                    "This may take a moment if you've recently made changes to your wishlist, exports, or this is your first time.",
+                    "Syncing and retrieving your TBR.\nThis may take a few minutes if you've recently made changes to your wishlist, exports, or this is your first time.",
                     text_align=ft.TextAlign.CENTER,
                     size=11
                 )

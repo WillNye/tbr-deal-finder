@@ -41,6 +41,7 @@ class AllBooksPage(BaseBookPage):
         """Load TBR books asynchronously using Flet's async support"""
         try:
             # Run the async operation directly
+            await self.app.auth_all_configured_retailers()
             self.items = await get_tbr_books(self.app.config)
             self.apply_filters()
         except Exception as e:
