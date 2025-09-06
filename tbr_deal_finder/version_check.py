@@ -1,13 +1,13 @@
 import requests
 from packaging import version
 import warnings
-from ._version import __version__
+from tbr_deal_finder import __VERSION__
 
 _PACKAGE_NAME = "tbr-deal-finder"
 
 def check_for_updates():
     """Check if a newer version is available on PyPI."""
-    current_version = __version__
+    current_version = __VERSION__
 
     try:
         response = requests.get(
@@ -33,7 +33,7 @@ def notify_if_outdated():
     if latest:
         warnings.warn(
             f"A new version of {_PACKAGE_NAME} is available ({latest}). "
-            f"You have {__version__}. Consider upgrading:\n"
+            f"You have {__VERSION__}. Consider upgrading:\n"
             f"pip install --upgrade {_PACKAGE_NAME}\nOr if you're running using uv:\ngit checkout main && git pull",
             UserWarning,
             stacklevel=2

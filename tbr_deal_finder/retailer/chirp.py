@@ -5,10 +5,8 @@ from datetime import datetime, timedelta
 from textwrap import dedent
 from typing import Union
 
-import aiohttp
 import click
 
-from tbr_deal_finder import TBR_DEALS_PATH
 from tbr_deal_finder.config import Config
 from tbr_deal_finder.retailer.models import AioHttpSession, Retailer, GuiAuthContext
 from tbr_deal_finder.book import Book, BookFormat, get_normalized_authors, is_matching_authors
@@ -54,9 +52,8 @@ class Chirp(AioHttpSession, Retailer):
             return {}
 
     def user_is_authed(self) -> bool:
-        auth_path = TBR_DEALS_PATH.joinpath("chirp.json")
-        if os.path.exists(auth_path):
-            with open(auth_path, "r") as f:
+        if os.path.exists(self.auth_path):
+            with open(self.auth_path, "r") as f:
                 auth_info = json.load(f)
                 if auth_info:
                     token_created_at = datetime.fromtimestamp(auth_info["created_at"])
@@ -70,7 +67,6 @@ class Chirp(AioHttpSession, Retailer):
         if self.user_is_authed():
             return
 
-        auth_path = TBR_DEALS_PATH.joinpath("chirp.json")
         response = await self.make_request(
             "POST",
             json={
@@ -89,7 +85,7 @@ class Chirp(AioHttpSession, Retailer):
         self.auth_token = response["data"]["signIn"]["user"]["token"]
 
         response["created_at"] = datetime.now().timestamp()
-        with open(auth_path, "w") as f:
+        with open(self.auth_path, "w") as f:
             json.dump(response, f)
 
     @property

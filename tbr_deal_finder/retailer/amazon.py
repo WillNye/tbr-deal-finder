@@ -9,17 +9,17 @@ from audible.login import build_init_cookies
 from textwrap import dedent
 
 from tbr_deal_finder.retailer.amazon_custom_auth import CustomAuthenticator
+from tbr_deal_finder.utils import get_data_dir
 
 if sys.platform != 'win32':
     # Breaks Windows support but required for Mac
     # Untested on Linux
     import readline  # type: ignore
 
-from tbr_deal_finder import TBR_DEALS_PATH
 from tbr_deal_finder.config import Config
 from tbr_deal_finder.retailer.models import Retailer, GuiAuthContext
 
-AUTH_PATH = TBR_DEALS_PATH.joinpath("audible.json")
+AUTH_PATH = get_data_dir().joinpath("audible.json")
 
 logger = logging.getLogger(__name__)
 

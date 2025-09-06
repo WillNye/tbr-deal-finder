@@ -3,9 +3,9 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Union
 
-from tbr_deal_finder import TBR_DEALS_PATH
+from tbr_deal_finder.utils import get_data_dir
 
-_CONFIG_PATH = TBR_DEALS_PATH.joinpath("config.ini")
+_CONFIG_PATH = get_data_dir().joinpath("config.ini")
 
 _LOCALE_CURRENCY_MAP = {
     "us": "$",

@@ -7,7 +7,6 @@ from typing import Union
 
 import click
 
-from tbr_deal_finder import TBR_DEALS_PATH
 from tbr_deal_finder.config import Config
 from tbr_deal_finder.retailer.models import AioHttpSession, Retailer, GuiAuthContext
 from tbr_deal_finder.book import Book, BookFormat, get_normalized_authors, is_matching_authors, get_normalized_title
@@ -59,9 +58,8 @@ class LibroFM(AioHttpSession, Retailer):
             return {}
 
     def user_is_authed(self) -> bool:
-        auth_path = TBR_DEALS_PATH.joinpath("libro_fm.json")
-        if os.path.exists(auth_path):
-            with open(auth_path, "r") as f:
+        if os.path.exists(self.auth_path):
+            with open(self.auth_path, "r") as f:
                 auth_info = json.load(f)
                 token_created_at = datetime.fromtimestamp(auth_info["created_at"])
                 max_token_age = datetime.now() - timedelta(days=7)
@@ -75,7 +73,6 @@ class LibroFM(AioHttpSession, Retailer):
         if self.user_is_authed():
             return
 
-        auth_path = TBR_DEALS_PATH.joinpath("libro_fm.json")
         response = await self.make_request(
             "/oauth/token",
             "POST",
@@ -90,7 +87,7 @@ class LibroFM(AioHttpSession, Retailer):
             await self.set_auth()
 
         self.auth_token = response["access_token"]
-        with open(auth_path, "w") as f:
+        with open(self.auth_path, "w") as f:
             json.dump(response, f)
 
     @property
@@ -104,8 +101,6 @@ class LibroFM(AioHttpSession, Retailer):
         )
 
     async def gui_auth(self, form_data: dict) -> bool:
-        auth_path = TBR_DEALS_PATH.joinpath("libro_fm.json")
-            
         response = await self.make_request(
             "/oauth/token",
             "POST",
@@ -119,7 +114,7 @@ class LibroFM(AioHttpSession, Retailer):
             return False
 
         self.auth_token = response["access_token"]
-        with open(auth_path, "w") as f:
+        with open(self.auth_path, "w") as f:
             json.dump(response, f)
         return True
 
