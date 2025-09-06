@@ -13,7 +13,7 @@
 
 DIST_DIR="gui_dist"
 APP_NAME="TBR Deal Finder"
-DMG_NAME="TBR-Deal-Finder-${VERSION#v}"
+DMG_NAME="TBR-Deal-Finder-${VERSION#v}-mac"
 VOLUME_NAME="TBR Deal Finder"
 SOURCE_APP="${DIST_DIR}/app/${APP_NAME}.app"
 OUTPUT_DMG="${DIST_DIR}/${DMG_NAME}.dmg"

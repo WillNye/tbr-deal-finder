@@ -138,7 +138,7 @@ jobs:
         DefaultGroupName=${{ env.APP_DISPLAY_NAME }}
         AllowNoIcons=yes
         OutputDir=.
-        OutputBaseFilename=${{ env.APP_FILENAME_BASE }}-${{ steps.app-info.outputs.app_version }}-Setup
+        OutputBaseFilename=${{ env.APP_FILENAME_BASE }}-${{ steps.app-info.outputs.app_version }}-Windows-Setup
         SetupIconFile=assets\icon.ico
         Compression=lzma2/normal
         SolidCompression=no
@@ -184,13 +184,13 @@ jobs:
       with:
         certificate: '${{ secrets.WINDOWS_CERTIFICATE }}'
         password: '${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}'
-        files: '${{ env.APP_FILENAME_BASE }}-${{ steps.app-info.outputs.app_version }}-Setup.exe'
+        files: '${{ env.APP_FILENAME_BASE }}-${{ steps.app-info.outputs.app_version }}-Windows-Setup.exe'
 
     - name: Upload Installer to Release
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        $installerFile = "${{ env.APP_FILENAME_BASE }}-${{ steps.app-info.outputs.app_version }}-Setup.exe"
+        $installerFile = "${{ env.APP_FILENAME_BASE }}-${{ steps.app-info.outputs.app_version }}-Windows-Setup.exe"
         
         gh release upload ${{ github.event.release.tag_name }} `
           $installerFile `
