@@ -15,7 +15,7 @@ from typing import Optional, Dict, Any
 import requests
 from packaging import version
 
-from ._version import __version__
+from tbr_deal_finder import __VERSION__
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +24,7 @@ class DesktopUpdater:
     
     def __init__(self, github_repo: str = "WillNye/tbr-deal-finder"):
         self.github_repo = github_repo
-        self.current_version = __version__
+        self.current_version = __VERSION__
         self.platform = platform.system().lower()
         
     def check_for_updates(self) -> Optional[Dict[str, Any]]:

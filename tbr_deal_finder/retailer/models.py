@@ -1,12 +1,14 @@
 import abc
 import asyncio
 import dataclasses
+from pathlib import Path
 from typing import Optional, Union
 
 import aiohttp
 
 from tbr_deal_finder.book import Book, BookFormat
 from tbr_deal_finder.config import Config
+from tbr_deal_finder.utils import get_data_dir
 
 
 @dataclasses.dataclass
@@ -36,6 +38,11 @@ class Retailer(abc.ABC):
         :return:
         """
         raise NotImplementedError
+
+    @property
+    def auth_path(self) -> Path:
+        name = self.name.replace(".", "").lower()
+        return get_data_dir().joinpath(f"{name}.json")
 
     @property
     def gui_auth_context(self) -> GuiAuthContext:

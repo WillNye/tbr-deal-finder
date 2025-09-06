@@ -2,19 +2,54 @@ import datetime
 import functools
 import os
 import re
+import sys
+from pathlib import Path
 from typing import Optional
 
 import click
 import duckdb
 
-from tbr_deal_finder import TBR_DEALS_PATH, QUERY_PATH
-from tbr_deal_finder.config import Config
+from tbr_deal_finder import QUERY_PATH
 
 
 @functools.cache
 def is_gui_env() -> bool:
     return os.environ.get("ENTRYPOINT", "GUI") == "GUI"
 
+
+@functools.cache
+def get_data_dir() -> Path:
+    """
+    Get the appropriate user data directory for each platform
+    following OS conventions
+    """
+    app_author = "WillNye"
+    app_name = "TBR Deal Finder"
+
+    if custom_path := os.getenv("TBR_DEAL_FINDER_CUSTOM_PATH"):
+        path = Path(custom_path)
+
+    elif not is_gui_env():
+        path = Path.home() / ".tbr_deal_finder"
+
+    elif sys.platform == "win32":
+        # Windows: C:\Users\Username\AppData\Local\AppAuthor\AppName
+        base = os.environ.get("LOCALAPPDATA", os.path.expanduser("~\\AppData\\Local"))
+        path = Path(base) / app_author / app_name
+
+    elif sys.platform == "darwin":
+        # macOS: ~/Library/Application Support/AppName
+        path = Path.home() / "Library" / "Application Support" / app_name
+
+    else:  # Linux and others
+        # Linux: ~/.local/share/appname (following XDG spec)
+        xdg_data_home = os.environ.get("XDG_DATA_HOME",
+                                       os.path.expanduser("~/.local/share"))
+        path = Path(xdg_data_home) / app_name.lower()
+
+    # Create directory if it doesn't exist
+    path.mkdir(parents=True, exist_ok=True)
+    return path
 
 def currency_to_float(price_str):
     """Parse various price formats to float."""
@@ -31,11 +66,12 @@ def currency_to_float(price_str):
 
 
 def float_to_currency(val: float) -> str:
+    from tbr_deal_finder.config import Config
     return f"{Config.currency_symbol()}{val:.2f}"
 
 
 def get_duckdb_conn():
-    return duckdb.connect(TBR_DEALS_PATH.joinpath("tbr_deal_finder.db"))
+    return duckdb.connect(get_data_dir().joinpath("tbr_deal_finder.db"))
 
 
 def execute_query(

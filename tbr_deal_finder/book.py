@@ -171,13 +171,16 @@ def print_books(config: Config, books: list[Book]):
             continue
 
         init_book = books_in_format[0]
-        if not is_qualifying_deal(config, init_book):
+        if not any(is_qualifying_deal(config, book) for book in books_in_format):
             continue
 
         echo_info(f"\n\n{init_book.format.value} Deals:")
 
         prior_title_id = init_book.title_id
         for book in books_in_format:
+            if not is_qualifying_deal(config, book):
+                continue
+
             if prior_title_id != book.title_id:
                 prior_title_id = book.title_id
                 click.echo()

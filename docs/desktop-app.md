@@ -13,10 +13,9 @@ The desktop app provides a beautiful graphical interface for managing your book 
 2. Download `TBRDealFinder-{version}-macOS.dmg`
 3. **Open the DMG**: Double-click the downloaded `.dmg` file
 4. **Handle Security Warning**: macOS will show "Cannot verify developer"
-   - **Solution**: Right-click the DMG → Select "Open" → Click "Open" again
+   - [Opening app from unknown developer](https://support.apple.com/guide/mac-help/open-a-mac-app-from-an-unknown-developer-mh40616/mac)
 5. **Install**: Drag the TBR Deal Finder app to your Applications folder
 6. **Launch**: Double-click the app in Applications
-7. **First Launch Security**: Right-click the app → "Open" → "Open" (one-time setup)
 
 #### Troubleshooting macOS
 - **"App can't be opened"**: Use right-click → Open instead of double-clicking

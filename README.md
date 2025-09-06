@@ -1,5 +1,6 @@
-# tbr-deal-finder
-
+<div>
+  <h1>TBR Deal Finder <img src="assets/icon.png" alt="TBR Deal Finder" width="128" height="128" style="vertical-align: middle; margin-left: 10px;"></h1>
+</div>
 Track price drops and find deals on books in your TBR (To Be Read) and wishlist across digital book retailers.
 
 ## Features
