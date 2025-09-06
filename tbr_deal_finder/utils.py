@@ -26,7 +26,10 @@ def get_data_dir() -> Path:
     app_author = "WillNye"
     app_name = "TBR Deal Finder"
 
-    if not is_gui_env():
+    if custom_path := os.getenv("TBR_DEAL_FINDER_CUSTOM_PATH"):
+        path = Path(custom_path)
+
+    elif not is_gui_env():
         path = Path.home() / ".tbr_deal_finder"
 
     elif sys.platform == "win32":
