@@ -99,8 +99,6 @@ class Chirp(AioHttpSession, Retailer):
         )
 
     async def gui_auth(self, form_data: dict) -> bool:
-        auth_path = TBR_DEALS_PATH.joinpath("chirp.json")
-
         response = await self.make_request(
             "POST",
             json={
@@ -127,7 +125,7 @@ class Chirp(AioHttpSession, Retailer):
         self.auth_token = auth_token
 
         response["created_at"] = datetime.now().timestamp()
-        with open(auth_path, "w") as f:
+        with open(self.auth_path, "w") as f:
             json.dump(response, f)
         return True
 
