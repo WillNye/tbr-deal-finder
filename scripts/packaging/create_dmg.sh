@@ -13,10 +13,13 @@
 
 DIST_DIR="gui_dist"
 APP_NAME="TBR Deal Finder"
-DMG_NAME="TBR-Deal-Finder-0.2.1"
+DMG_NAME="TBR-Deal-Finder-${VERSION#v}"
 VOLUME_NAME="TBR Deal Finder"
 SOURCE_APP="${DIST_DIR}/app/${APP_NAME}.app"
 OUTPUT_DMG="${DIST_DIR}/${DMG_NAME}.dmg"
+
+echo "📋 Using version: ${VERSION}"
+echo "📦 DMG name will be: ${DMG_NAME}.dmg"
 
 # Determine signing approach
 if [ -z "$CODESIGN_IDENTITY" ]; then
