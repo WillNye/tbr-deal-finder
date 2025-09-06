@@ -103,10 +103,7 @@ build-all:
 # Clean build artifacts (preserves .spec file for version control)
 clean:
 	@echo "🧹 Cleaning build artifacts..."
-	rm -rf $(DIST_DIR)/*.app
-	rm -rf $(DIST_DIR)/*.dmg
-	rm -rf $(DIST_DIR)/*.exe
-	rm -rf $(DIST_DIR)/TBRDealFinder
+	rm -rf $(DIST_DIR)/
 	rm -rf build/
 	@echo "✅ Clean complete (kept .spec file)"
 

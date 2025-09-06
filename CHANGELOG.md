@@ -3,7 +3,7 @@
 
 ---
 
-## 0.3.0 (August X, 2025)
+## 0.3.0 (September 5, 2025)
 
 Notes: 
 * Added a GUI to serve as a desktop app
