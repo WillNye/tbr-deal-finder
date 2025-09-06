@@ -1,6 +1,6 @@
 import asyncio
 import json
-import readline  # type: ignore
+from typing import Union
 
 from tbr_deal_finder.config import Config
 from tbr_deal_finder.retailer.amazon import Amazon, AUTH_PATH
@@ -19,6 +19,10 @@ class Kindle(Amazon):
     @property
     def format(self) -> BookFormat:
         return BookFormat.EBOOK
+
+    @property
+    def max_concurrency(self) -> int:
+        return 3
 
     def _get_base_url(self) -> str:
         return f"https://www.amazon.{self._auth.locale.domain}"
@@ -73,7 +77,7 @@ class Kindle(Amazon):
         self,
         target: Book,
         semaphore: asyncio.Semaphore
-    ) -> Book:
+    ) -> Union[Book, None]:
         target.exists = False
 
         if not target.ebook_asin:
@@ -81,26 +85,34 @@ class Kindle(Amazon):
 
         asin = target.ebook_asin
         async with semaphore:
-            match = await self._client.get(
-                f"{self._get_base_url()}/api/bifrost/offers/batch/v1/{asin}?ref_=KindleDeepLinkOffers",
-                headers={"x-client-id": "kindle-android-deeplink"},
-            )
-            products = match.get("resources", [])
-            if not products:
+            for i in range(10):
+                match = await self._client.get(
+                    f"{self._get_base_url()}/api/bifrost/offers/batch/v1/{asin}?ref_=KindleDeepLinkOffers",
+                    headers={"x-client-id": "kindle-android-deeplink"},
+                )
+                products = match.get("resources", [])
+                if not products:
+                    await asyncio.sleep(1)
+                    continue
+
+                actions = products[0].get("personalizedActionOutput", {}).get("personalizedActions", [])
+                if not actions:
+                    await asyncio.sleep(1)
+                    continue
+
+                for action in actions:
+                    if "printListPrice" in action["offer"]:
+                        target.list_price = action["offer"]["printListPrice"]["value"]
+                        target.current_price = action["offer"]["digitalPrice"]["value"]
+                        target.exists = True
+                        break
+
+                # The sleep is a pre-emptive backoff
+                # Concurrency is already low, but this endpoint loves to throttle
+                await asyncio.sleep(.25)
                 return target
 
-            actions = products[0].get("personalizedActionOutput", {}).get("personalizedActions", [])
-            if not actions:
-                return target
-
-            for action in actions:
-                if "printListPrice" in action["offer"]:
-                    target.list_price = action["offer"]["printListPrice"]["value"]
-                    target.current_price = action["offer"]["digitalPrice"]["value"]
-                    target.exists = True
-                    break
-
-            return target
+            return None
 
     async def get_wishlist(self, config: Config) -> list[Book]:
         """Not currently supported

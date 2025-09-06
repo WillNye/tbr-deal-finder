@@ -1,5 +1,6 @@
 import asyncio
 import math
+from typing import Union
 
 from tbr_deal_finder.config import Config
 from tbr_deal_finder.retailer.amazon import Amazon
@@ -20,7 +21,7 @@ class Audible(Amazon):
         self,
         target: Book,
         semaphore: asyncio.Semaphore
-    ) -> Book:
+    ) -> Union[Book, None]:
         title = target.title
         authors = target.authors
 

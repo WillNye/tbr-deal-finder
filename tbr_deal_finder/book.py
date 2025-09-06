@@ -8,7 +8,7 @@ from Levenshtein import ratio
 from unidecode import unidecode
 
 from tbr_deal_finder.config import Config
-from tbr_deal_finder.utils import get_duckdb_conn, execute_query, get_query_by_name, echo_info
+from tbr_deal_finder.utils import get_duckdb_conn, execute_query, get_query_by_name, echo_info, float_to_currency
 
 _AUTHOR_RE = re.compile(r'[^a-zA-Z0-9]')
 
@@ -60,10 +60,6 @@ class Book:
 
         return int((1 - self.current_price/self.list_price) * 100)
 
-    @staticmethod
-    def price_to_string(price: float) -> str:
-        return f"{Config.currency_symbol()}{price:.2f}"
-
     @property
     def deal_id(self) -> str:
         return f"{self.title}__{self.normalized_authors}__{self.format}__{self.retailer}"
@@ -93,10 +89,10 @@ class Book:
         self._list_price = round(price, 2)
 
     def list_price_string(self):
-        return self.price_to_string(self.list_price)
+        return float_to_currency(self.list_price)
 
     def current_price_string(self):
-        return self.price_to_string(self.current_price)
+        return float_to_currency(self.current_price)
 
     def __str__(self) -> str:
         price = self.current_price_string()
@@ -159,7 +155,11 @@ def get_active_deals() -> list[Book]:
     return [Book(**book) for book in query_response]
 
 
-def print_books(books: list[Book]):
+def is_qualifying_deal(config: Config, book: Book) -> bool:
+    return book.current_price <= config.max_price and book.discount() >= config.min_discount
+
+
+def print_books(config: Config, books: list[Book]):
     audiobooks = [book for book in books if book.format == BookFormat.AUDIOBOOK]
     audiobooks = sorted(audiobooks, key=lambda book: book.deal_id)
 
@@ -171,6 +171,9 @@ def print_books(books: list[Book]):
             continue
 
         init_book = books_in_format[0]
+        if not is_qualifying_deal(config, init_book):
+            continue
+
         echo_info(f"\n\n{init_book.format.value} Deals:")
 
         prior_title_id = init_book.title_id
@@ -183,10 +186,12 @@ def print_books(books: list[Book]):
 
 
 def get_full_title_str(title: str, authors: Union[list, str]) -> str:
+    title = get_normalized_title(title)
     return f"{title}__{get_normalized_authors(authors)}"
 
 
 def get_title_id(title: str, authors: Union[list, str], book_format: BookFormat) -> str:
+    title = get_normalized_title(title)
     return f"{title}__{get_normalized_authors(authors)}__{book_format.value}"
 
 

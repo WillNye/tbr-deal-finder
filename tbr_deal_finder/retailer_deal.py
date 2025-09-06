@@ -11,7 +11,7 @@ from tbr_deal_finder.config import Config
 from tbr_deal_finder.tracked_books import get_tbr_books, get_unknown_books, set_unknown_books
 from tbr_deal_finder.retailer import RETAILER_MAP
 from tbr_deal_finder.retailer.models import Retailer
-from tbr_deal_finder.utils import get_duckdb_conn, echo_warning, echo_info
+from tbr_deal_finder.utils import get_duckdb_conn, echo_info, echo_err, is_gui_env
 
 
 def update_retailer_deal_table(config: Config, new_deals: list[Book]):
@@ -37,14 +37,6 @@ def update_retailer_deal_table(config: Config, new_deals: list[Book]):
             active_deal_map.pop(deal.deal_id)
         else:
             df_data.append(deal.dict())
-
-    # Any remaining values in active_deal_map mean that
-    # it wasn't found and should be marked for deletion
-    for deal in active_deal_map.values():
-        echo_warning(f"{str(deal)} is no longer active\n")
-        deal.timepoint = config.run_time
-        deal.deleted = True
-        df_data.append(deal.dict())
 
     if df_data:
         df = pd.DataFrame(df_data)
@@ -75,7 +67,7 @@ async def _get_books(
     Returns:
         List of Book objects with updated pricing and availability
     """
-    semaphore = asyncio.Semaphore(10)
+    semaphore = asyncio.Semaphore(retailer.max_concurrency)
     response = []
     unknown_books = []
     books = [copy.deepcopy(book) for book in books]
@@ -88,9 +80,21 @@ async def _get_books(
         for book in books
         if book.deal_id not in ignored_deal_ids
     ]
-    results = await tqdm_asyncio.gather(*tasks, desc=f"Getting latest prices from {retailer.name}")
+
+    if is_gui_env():
+        results = await asyncio.gather(*tasks)
+    else:
+        results = await tqdm_asyncio.gather(*tasks, desc=f"Getting latest prices from {retailer.name}")
+
     for book in results:
-        if book.exists:
+        if not book:
+            """Cases where we know the retailer has the book but it's not coming back.
+            We don't want to mark it as unknown it's more like we just got rate limited.
+
+            Kindle has been particularly bad about this. 
+            """
+            continue
+        elif book.exists:
             response.append(book)
         elif not book.exists:
             unknown_books.append(book)
@@ -157,7 +161,7 @@ def _get_retailer_relevant_tbr_books(
     return response
 
 
-async def get_latest_deals(config: Config):
+async def _get_latest_deals(config: Config):
     """
     Fetches the latest book deals from all tracked retailers for the user's TBR list.
 
@@ -206,8 +210,28 @@ async def get_latest_deals(config: Config):
     books = [
         book
         for book in books
-        if book.current_price <= config.max_price and book.discount() >= config.min_discount
     ]
 
     update_retailer_deal_table(config, books)
     set_unknown_books(config, unknown_books)
+
+
+async def get_latest_deals(config: Config) -> bool:
+    try:
+        await _get_latest_deals(config)
+    except Exception as e:
+        ran_successfully = False
+        details = f"Error getting deals: {e}"
+        echo_err(details)
+    else:
+        ran_successfully = True
+        details = ""
+
+    # Save execution results
+    db_conn = get_duckdb_conn()
+    db_conn.execute(
+        "INSERT INTO latest_deal_run_history (timepoint, ran_successfully, details) VALUES (?, ?, ?)",
+        [config.run_time, ran_successfully, details]
+    )
+
+    return ran_successfully

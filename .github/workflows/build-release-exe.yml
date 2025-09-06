@@ -1,0 +1,198 @@
+name: Build and Attach Windows EXE to Release
+
+on:
+  release:
+    types: [created]
+
+permissions:
+  contents: write
+  
+jobs:
+  build-exe:
+    runs-on: windows-latest
+    env:
+      HAS_WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE != '' }}
+      HAS_WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD != '' }}
+      APP_DISPLAY_NAME: "TBR Deal Finder"
+      APP_FILENAME_BASE: "TBR-Deal-Finder"
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.29.2'
+        channel: 'stable'
+
+    - name: Enable Windows Desktop
+      run: flutter config --enable-windows-desktop
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.13'
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v5
+
+    - name: Install project dependencies
+      run: |
+        uv sync
+
+    - name: Import Code Signing Certificate (if available)
+      if: ${{ env.HAS_WINDOWS_CERTIFICATE == 'true' && env.HAS_WINDOWS_CERTIFICATE_PASSWORD == 'true' }}
+      run: |
+        # Decode and import certificate
+        $certBytes = [System.Convert]::FromBase64String("${{ secrets.WINDOWS_CERTIFICATE }}")
+        $certPath = "windows-cert.pfx"
+        [System.IO.File]::WriteAllBytes($certPath, $certBytes)
+        
+        # Import certificate to certificate store
+        $securePassword = ConvertTo-SecureString -String "${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}" -Force -AsPlainText
+        Import-PfxCertificate -FilePath $certPath -CertStoreLocation Cert:\CurrentUser\My -Password $securePassword
+        
+        Write-Output "✅ Code signing certificate imported successfully"
+        
+        # Clean up certificate file
+        Remove-Item $certPath -Force
+
+    - name: Build Windows EXE
+      env:
+        PYTHONIOENCODING: utf-8
+        PYTHONLEGACYWINDOWSFSENCODING: utf-8
+        # Disable Rich progress bars to avoid Unicode issues
+        TERM: dumb
+        NO_COLOR: 1
+      run: |
+        # Set console to UTF-8 to handle Unicode characters
+        chcp 65001
+        
+        # Clean any existing build cache to ensure fresh plugin compilation
+        Write-Output "🧹 Cleaning build cache..."
+        Remove-Item -Path "build" -Recurse -Force -ErrorAction SilentlyContinue
+        Remove-Item -Path "gui_dist" -Recurse -Force -ErrorAction SilentlyContinue
+        
+        # Use flet to build Windows executable (Flutter environment now properly set up)
+        Write-Output "🪟 Building Windows executable..."
+        uv run flet build windows --output gui_dist/ --verbose
+        
+        Write-Output "📁 Build output contents:"
+        Get-ChildItem -Path gui_dist -Recurse | Format-Table Name, Length, LastWriteTime
+
+    - name: Sign Windows EXE (if certificate available)
+      if: ${{ env.HAS_WINDOWS_CERTIFICATE == 'true' && env.HAS_WINDOWS_CERTIFICATE_PASSWORD == 'true' }}
+      uses: dlemstra/code-sign-action@v1
+      with:
+        certificate: '${{ secrets.WINDOWS_CERTIFICATE }}'
+        password: '${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}'
+        folder: 'gui_dist'
+        recursive: true
+
+    - name: Get App Info
+      id: app-info
+      run: |
+        # Find the EXE file
+        $exeFile = Get-ChildItem -Path "gui_dist" -Filter "*.exe" | Select-Object -First 1
+        if (-not $exeFile) {
+          Write-Output "❌ EXE file not found!"
+          exit 1
+        }
+        
+        $exeName = [System.IO.Path]::GetFileNameWithoutExtension($exeFile.Name)
+        $appVersion = "${{ github.event.release.tag_name }}".TrimStart('v')
+        
+        # Default to 1.0.0 if tag isn't semver
+        if (-not ($appVersion -match '^\d+\.\d+\.\d+')) {
+          $appVersion = "1.0.0"
+        }
+        
+        Write-Output "exe_name=$($exeFile.Name)" >> $env:GITHUB_OUTPUT
+        Write-Output "exe_base_name=$exeName" >> $env:GITHUB_OUTPUT
+        Write-Output "app_version=$appVersion" >> $env:GITHUB_OUTPUT
+
+    - name: Install Inno Setup
+      run: |
+        # Download and install Inno Setup silently
+        Invoke-WebRequest -Uri "https://jrsoftware.org/download.php/is.exe" -OutFile "innosetup.exe"
+        Start-Process -FilePath ".\innosetup.exe" -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/SP-" -Wait
+        
+        # Add to PATH for current session
+        $env:PATH += ";C:\Program Files (x86)\Inno Setup 6"
+        
+        Write-Output "✅ Inno Setup installed successfully"
+
+    - name: Create InnoSetup Script
+      run: |
+        @"
+        [Setup]
+        AppId={{$(New-Guid)}}
+        AppName=${{ env.APP_DISPLAY_NAME }}
+        AppVersion=${{ steps.app-info.outputs.app_version }}
+        AppPublisher=WillNye
+        AppPublisherURL=https://github.com/WillNye
+        AppSupportURL=https://github.com/WillNye/${{ github.event.repository.name }}/issues
+        AppUpdatesURL=https://github.com/WillNye/${{ github.event.repository.name }}/releases
+        DefaultDirName={autopf}\${{ env.APP_DISPLAY_NAME }}
+        DefaultGroupName=${{ env.APP_DISPLAY_NAME }}
+        AllowNoIcons=yes
+        OutputDir=.
+        OutputBaseFilename=${{ env.APP_FILENAME_BASE }}-${{ steps.app-info.outputs.app_version }}-Setup
+        SetupIconFile=assets\icon.ico
+        Compression=lzma2/normal
+        SolidCompression=no
+        WizardStyle=modern
+        PrivilegesRequired=lowest
+        PrivilegesRequiredOverridesAllowed=dialog
+        
+        [Languages]
+        Name: "english"; MessagesFile: "compiler:Default.isl"
+        
+        [Tasks]
+        Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
+        
+        [Files]
+        ; Exclude EXE from compression to preserve icon quality
+        Source: "gui_dist\${{ steps.app-info.outputs.exe_name }}"; DestDir: "{app}"; Flags: ignoreversion nocompression
+        ; Compress everything else
+        Source: "gui_dist\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "${{ steps.app-info.outputs.exe_name }}"
+        
+        [Icons]
+        Name: "{group}\${{ env.APP_DISPLAY_NAME }}"; Filename: "{app}\${{ steps.app-info.outputs.exe_name }}"
+        Name: "{group}\{cm:UninstallProgram,${{ env.APP_DISPLAY_NAME }}}"; Filename: "{uninstallexe}"
+        Name: "{autodesktop}\${{ env.APP_DISPLAY_NAME }}"; Filename: "{app}\${{ steps.app-info.outputs.exe_name }}"; Tasks: desktopicon
+        
+        [Run]
+        Filename: "{app}\${{ steps.app-info.outputs.exe_name }}"; Description: "{cm:LaunchProgram,${{ env.APP_DISPLAY_NAME }}}"; Flags: nowait postinstall skipifsilent
+        "@ | Out-File -FilePath "setup.iss" -Encoding UTF8
+    - name: Build Setup with InnoSetup
+      run: |
+        # Compile the installer
+        & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" setup.iss
+        
+        if ($LASTEXITCODE -ne 0) {
+          Write-Output "❌ InnoSetup compilation failed with exit code: $LASTEXITCODE"
+          exit 1
+        }
+        
+        Write-Output "✅ Installer created successfully"
+
+    - name: Sign Installer (if certificate available)
+      if: ${{ env.HAS_WINDOWS_CERTIFICATE == 'true' && env.HAS_WINDOWS_CERTIFICATE_PASSWORD == 'true' }}
+      uses: dlemstra/code-sign-action@v1
+      with:
+        certificate: '${{ secrets.WINDOWS_CERTIFICATE }}'
+        password: '${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}'
+        files: '${{ env.APP_FILENAME_BASE }}-${{ steps.app-info.outputs.app_version }}-Setup.exe'
+
+    - name: Upload Installer to Release
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        $installerFile = "${{ env.APP_FILENAME_BASE }}-${{ steps.app-info.outputs.app_version }}-Setup.exe"
+        
+        gh release upload ${{ github.event.release.tag_name }} `
+          $installerFile `
+          --clobber `
+          --repo ${{ github.repository }}
