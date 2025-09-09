@@ -274,6 +274,9 @@ class LatestDealsPage(BaseBookPage):
         self.progress_container.visible = True
         self.run_button.disabled = True
         
+        # Disable navigation during the operation
+        self.app.disable_navigation()
+        
         # Update the page to show loading state
         self.app.page.update()
         
@@ -298,6 +301,9 @@ class LatestDealsPage(BaseBookPage):
             self.progress_container.visible = False
             self.run_button.disabled = False
             self.check_last_run()  # Refresh the status
+            
+            # Re-enable navigation after the operation
+            self.app.enable_navigation()
             
             # Update the page to reset loading state
             self.app.page.update()

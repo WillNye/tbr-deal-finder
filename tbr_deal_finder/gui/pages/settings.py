@@ -309,6 +309,7 @@ class SettingsPage:
             clear_unknown_books()
             
             self.show_success("Configuration saved successfully!")
+            self.app.enable_navigation()
             self.app.config_updated(self.config)
             
         except Exception as ex:

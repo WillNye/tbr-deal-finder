@@ -26,6 +26,7 @@ class TBRDealFinderApp:
         self.current_page = "all_deals"
         self.selected_book = None
         self.update_info = None  # Store update information
+        self.nav_disabled = False  # Track navigation disabled state
         
         # Initialize pages
         self.settings_page = SettingsPage(self)
@@ -258,6 +259,16 @@ class TBRDealFinderApp:
 
     def nav_changed(self, e):
         """Handle navigation rail selection changes"""
+        # Prevent navigation if disabled
+        if self.nav_disabled:
+            # Reset to current page selection to prevent visual change
+            current_indices = {"all_deals": 0, "latest_deals": 1, "all_books": 2}
+            self.nav_rail.selected_index = current_indices.get(self.current_page, 0)
+            # Reapply disabled state after page update
+            self.nav_rail.disabled = True
+            self.page.update()
+            return
+            
         destinations = ["all_deals", "latest_deals", "all_books"]
         if e.control.selected_index < len(destinations):
             self.current_page = destinations[e.control.selected_index]
@@ -289,6 +300,23 @@ class TBRDealFinderApp:
         self.latest_deals_page.refresh_page_state()
         self.all_books_page.refresh_page_state()
 
+    def disable_navigation(self):
+        """Disable navigation rail during background operations"""
+        self.nav_disabled = True
+        if hasattr(self, 'nav_rail'):
+            self.nav_rail.disabled = True
+            self.page.update()
+
+    def enable_navigation(self):
+        """Enable navigation rail after background operations complete"""
+        if not self.nav_disabled:
+            return
+
+        self.nav_disabled = False
+        if hasattr(self, 'nav_rail'):
+            self.nav_rail.disabled = False
+            self.page.update()
+
     def get_current_page_content(self):
         """Get content for the current page"""
         if self.config is None and self.current_page != "settings":
@@ -309,6 +337,7 @@ class TBRDealFinderApp:
 
     def get_config_prompt(self):
         """Show config setup prompt when no config exists"""
+        self.disable_navigation()
         return ft.Container(
             content=ft.Column([
                 ft.Icon(ft.Icons.SETTINGS, size=64, color=ft.Colors.GREY_400),
