@@ -13,9 +13,11 @@ The desktop app provides a beautiful graphical interface for managing your book 
 2. Download `TBRDealFinder-{version}-macOS.dmg`
 3. **Open the DMG**: Double-click the downloaded `.dmg` file
 4. **Handle Security Warning**: macOS will show "Cannot verify developer"
-   - [Opening app from unknown developer](https://support.apple.com/guide/mac-help/open-a-mac-app-from-an-unknown-developer-mh40616/mac)
+   - Click Done to handle the warning before continuing with the install
+   - [Follow guide from Apple](https://support.apple.com/guide/mac-help/open-a-mac-app-from-an-unknown-developer-mh40616/mac)
 5. **Install**: Drag the TBR Deal Finder app to your Applications folder
 6. **Launch**: Double-click the app in Applications
+7. **Wait for loader**: The app has a special loader and can take a minute to load for the first time
 
 #### Troubleshooting macOS
 - **"App can't be opened"**: Use right-click → Open instead of double-clicking
@@ -31,44 +33,11 @@ The desktop app provides a beautiful graphical interface for managing your book 
    - **Solution**: Click "More info" → Click "Run anyway"
 5. **Install**: Follow the installation wizard
 6. **Launch**: The app will be available in your Start Menu or Desktop
+7. **Wait for loader**: The app has a special loader and can take a minute to load for the first time
 
 #### Troubleshooting Windows
 - **Windows Defender blocks**: Click "More info" → "Run anyway"
 - **Still blocked**: Temporarily disable real-time protection, install, then re-enable
-
-### 🐧 Linux Installation
-
-#### Download & Install
-1. Go to the [latest release](https://github.com/yourusername/tbr-deal-finder/releases/latest)
-2. Download `TBRDealFinder-{version}-Linux`
-3. **Make Executable**: 
-   ```bash
-   chmod +x TBRDealFinder-{version}-Linux
-   ```
-4. **Move to Applications** (optional):
-   ```bash
-   sudo mv TBRDealFinder-{version}-Linux /usr/local/bin/tbr-deal-finder
-   ```
-5. **Launch**: 
-   ```bash
-   ./TBRDealFinder-{version}-Linux
-   # Or if moved: tbr-deal-finder
-   ```
-
-#### Create Desktop Entry (Linux)
-For easier launching, create a desktop entry:
-```bash
-cat > ~/.local/share/applications/tbr-deal-finder.desktop << EOF
-[Desktop Entry]
-Name=TBR Deal Finder
-Comment=Track price drops and find deals on books
-Exec=/path/to/TBRDealFinder-{version}-Linux
-Icon=applications-office
-Terminal=false
-Type=Application
-Categories=Office;Utility;
-EOF
-```
 
 ## 🎯 First Time Setup
 
@@ -100,68 +69,6 @@ Create your own with these columns:
    - Set minimum discount percentage
 3. **Start Finding Deals**: The app begins searching automatically
 
-## 📖 Using the Desktop App
-
-### Main Interface
-
-#### 🆕 Latest Deals View
-- **Purpose**: Shows newly discovered deals since your last check
-- **Features**: Book covers, titles, authors, current and original prices
-- **Actions**: Click any book for detailed information and purchase links
-
-#### 📚 All Active Deals View  
-- **Purpose**: Browse all currently active deals
-- **Features**: Filter by retailer, price range, discount percentage
-- **Sorting**: By discount amount, price, or date discovered
-- **Best For**: Weekly browsing of all available deals
-
-#### 📖 All Books View
-- **Purpose**: Manage your tracked books library
-- **Features**: See all books being tracked for deals
-- **Actions**: Add new books or remove books from tracking
-- **Status**: See which books currently have active deals
-
-#### ⚙️ Settings View
-- **Configuration**: Update deal preferences and price limits
-- **Data Management**: Add new CSV files or update existing ones
-- **Notifications**: Configure how you want to be alerted about deals
-- **Account**: Manage your locale and retailer preferences
-
-### Navigation Tips
-- **Side Menu**: Quick switching between views
-- **Search Bar**: Find specific books or authors instantly  
-- **Filter Panel**: Narrow results by price, discount, or retailer
-- **Book Details**: Click any book for comprehensive information
-
-### Understanding Deal Information
-Each deal displays:
-- **Book cover and title**
-- **Author name(s)**
-- **Original price** vs **Sale price**
-- **Discount percentage** 
-- **Retailer** (Audible, Kindle, Chirp, Libro.fm)
-- **Deal expiration** (when available)
-
-## 🔄 Regular Usage Workflow
-
-### Daily Deal Checking (5 minutes)
-1. **Open the App**
-2. **Check Latest Deals View** 
-3. **Review New Discoveries**
-4. **Click Through** to purchase interesting deals
-
-### Weekly Management (15 minutes)  
-1. **Browse All Active Deals** for comprehensive view
-2. **Update Your Library** by adding new books to track
-3. **Remove Purchased Books** to keep library current
-4. **Adjust Settings** if your preferences have changed
-
-### Monthly Maintenance (30 minutes)
-1. **Export Fresh Reading Lists** from StoryGraph/Goodreads
-2. **Upload Updated CSVs** via Settings
-3. **Review Price Limits** and adjust for seasonal sales
-4. **Clean Up Library** by removing uninteresting books
-
 ## 🔄 Updating the Desktop App
 
 ### Checking for Updates
@@ -176,8 +83,8 @@ Currently, updates require manual download:
 1. **Download Latest Version**:
    - macOS: `TBRDealFinder-{version}-macOS.dmg`
    - Windows: `TBRDealFinder-{version}-Windows.exe`
-   - Linux: `TBRDealFinder-{version}-Linux`
 2. **Install Over Existing**: Follow same installation steps
+   - If prompted, choose to replace files or overwrite the existing application
 3. **Preserve Settings**: Your configuration and data are automatically preserved
 4. **Verify Update**: Check version in Settings after installation
 
@@ -186,7 +93,6 @@ Currently, updates require manual download:
 ### App Won't Launch
 - **macOS**: Right-click app → Open, check Security & Privacy settings
 - **Windows**: Run as administrator, check Windows Defender
-- **Linux**: Verify file permissions (`chmod +x`)
 
 ### No Deals Found
 - **Check CSV Format**: Ensure titles and authors are correct
@@ -194,45 +100,21 @@ Currently, updates require manual download:
 - **Wait**: Deals fluctuate - check back regularly
 
 ### Performance Issues
+#### Initial Run
+When the app initially starts the app may be white up to a minute while the tbr deal finder package loads.
+
+#### Getting latest deals
+Getting pricing info for Kindle can take up to a second per book.
+It doesn't sound like a lot, but if you have 400 books in your tbr it may take around 7 minutes.
+If you're not checking for deals on Kindle, getting deals should only take a couple minutes.
+Don't close the app while getting deals or progress may be lost.
+
+#### Still having issues
 - **Restart App**: Close and reopen to clear memory
 - **Update**: Ensure you're running the latest version
 - **System**: Close other applications to free resources
 
-### Settings Not Saving
-- **Permissions**: Ensure app can write to user directory
-- **Restart**: Close app completely and reopen
-- **Reinstall**: Download fresh copy if issues persist
-
-## 📊 System Requirements
-
-### Minimum Requirements
-- **macOS**: 10.14 or later
-- **Windows**: Windows 10 or later  
-- **Linux**: Modern distribution with GUI support
-
-## 💡 What Makes This App Special
-
-### Smart Deal Discovery
-- **Automated Searching**: Checks multiple retailers automatically
-- **Intelligent Matching**: Finds your books across different platforms
-- **Price Tracking**: Monitors for temporary sales and price drops
-
-### User-Friendly Design
-- **No Command Line**: Everything through visual interface
-- **Beautiful Interface**: Modern design with book covers
-- **Easy Setup**: Wizard guides you through configuration
-
-### Comprehensive Coverage
-- **Multiple Retailers**: Audible, Kindle, Chirp, Libro.fm
-- **Global Support**: Works in US, CA, UK, AU, FR, DE, JP, IT, IN, ES, BR
-- **Both Formats**: Audiobooks and ebooks in one place
-
 ## 🆘 Getting Help
-
-### Self-Help Resources
-1. **Check This Guide**: Most questions are answered here
-2. **Try Troubleshooting**: Common issues have solutions above
-3. **Update App**: Many issues are fixed in newer versions
 
 ### Community Support
 1. **GitHub Issues**: [Report bugs or ask questions](https://github.com/yourusername/tbr-deal-finder/issues)
