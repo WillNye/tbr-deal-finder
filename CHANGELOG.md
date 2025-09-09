@@ -3,6 +3,18 @@
 
 ---
 
+## 0.3.2 (September 8, 2025)
+
+Notes: 
+* Disable nav bar buttons when performing certain operations
+* Added config check to CLI location when running the desktop app for backwards compatibility
+* Improved performance when retrieving "latest deals"
+
+BUG FIXES:
+* Fixed issue with scroll bar in the "all deals" page
+
+---
+
 ## 0.3.1 (September 5, 2025)
 
 Notes: 

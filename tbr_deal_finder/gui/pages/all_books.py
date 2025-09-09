@@ -39,6 +39,9 @@ class AllBooksPage(BaseBookPage):
 
     async def _async_load_items(self):
         """Load TBR books asynchronously using Flet's async support"""
+        # Disable navigation during the loading operation
+        self.app.disable_navigation()
+        
         try:
             # Run the async operation directly
             await self.app.auth_all_configured_retailers()
@@ -50,6 +53,10 @@ class AllBooksPage(BaseBookPage):
             self.filtered_items = []
         finally:
             self.set_loading(False)
+            
+            # Re-enable navigation after the operation completes
+            self.app.enable_navigation()
+            
             # Update the page to reflect the loaded data
             self.app.page.update()
 

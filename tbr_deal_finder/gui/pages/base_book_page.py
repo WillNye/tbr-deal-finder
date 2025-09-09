@@ -142,8 +142,7 @@ class BaseBookPage(ABC):
             item_tiles.append(tile)
         
         return ft.Container(
-            content=ft.ListView(item_tiles, spacing=5),
-            height=700,
+            content=ft.Column(item_tiles, spacing=5),
             border=ft.border.all(1, ft.Colors.OUTLINE),
             border_radius=8,
             padding=10

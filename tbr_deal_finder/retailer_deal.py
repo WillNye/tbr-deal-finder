@@ -2,16 +2,14 @@ import asyncio
 import copy
 from collections import defaultdict
 
-import click
 import pandas as pd
-from tqdm.asyncio import tqdm_asyncio
 
 from tbr_deal_finder.book import Book, get_active_deals, BookFormat
 from tbr_deal_finder.config import Config
 from tbr_deal_finder.tracked_books import get_tbr_books, get_unknown_books, set_unknown_books
 from tbr_deal_finder.retailer import RETAILER_MAP
 from tbr_deal_finder.retailer.models import Retailer
-from tbr_deal_finder.utils import get_duckdb_conn, echo_info, echo_err, is_gui_env
+from tbr_deal_finder.utils import get_duckdb_conn, echo_info, echo_err
 
 
 def update_retailer_deal_table(config: Config, new_deals: list[Book]):
@@ -67,6 +65,13 @@ async def _get_books(
     Returns:
         List of Book objects with updated pricing and availability
     """
+
+    echo_info(f"Getting deals from {retailer.name}")
+    books = _get_retailer_relevant_tbr_books(
+        retailer,
+        books,
+    )
+
     semaphore = asyncio.Semaphore(retailer.max_concurrency)
     response = []
     unknown_books = []
@@ -81,11 +86,7 @@ async def _get_books(
         if book.deal_id not in ignored_deal_ids
     ]
 
-    if is_gui_env():
-        results = await asyncio.gather(*tasks)
-    else:
-        results = await tqdm_asyncio.gather(*tasks, desc=f"Getting latest prices from {retailer.name}")
-
+    results = await asyncio.gather(*tasks)
     for book in results:
         if not book:
             """Cases where we know the retailer has the book but it's not coming back.
@@ -99,9 +100,7 @@ async def _get_books(
         elif not book.exists:
             unknown_books.append(book)
 
-    click.echo()
-    for book in unknown_books:
-        echo_info(f"{book.title} by {book.authors} not found")
+    echo_info(f"Finished getting deals from {retailer.name}")
 
     return response, unknown_books
 
@@ -184,34 +183,26 @@ async def _get_latest_deals(config: Config):
     ignore_books: list[Book] = get_unknown_books(config)
     ignored_deal_ids: set[str] = {book.deal_id for book in ignore_books}
 
+    tasks = []
     for retailer_str in config.tracked_retailers:
         retailer = RETAILER_MAP[retailer_str]()
         await retailer.set_auth()
 
-        relevant_tbr_books = _get_retailer_relevant_tbr_books(
-            retailer,
-            tbr_books,
+        tasks.append(
+            _get_books(
+                config,
+                retailer,
+                tbr_books,
+                ignored_deal_ids
+            )
         )
 
-        echo_info(f"Getting deals from {retailer.name}")
-        click.echo("\n---------------")
-        retailer_books, u_books = await _get_books(
-            config,
-            retailer,
-            relevant_tbr_books,
-            ignored_deal_ids
-        )
+    results = await asyncio.gather(*tasks)
+    for retailer_books, u_books in results:
         books.extend(retailer_books)
         unknown_books.extend(u_books)
-        click.echo("---------------\n")
 
     _apply_proper_list_prices(books)
-
-    books = [
-        book
-        for book in books
-    ]
-
     update_retailer_deal_table(config, books)
     set_unknown_books(config, unknown_books)
 

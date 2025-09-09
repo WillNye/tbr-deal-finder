@@ -27,25 +27,34 @@ def get_data_dir() -> Path:
     app_name = "TBR Deal Finder"
 
     if custom_path := os.getenv("TBR_DEAL_FINDER_CUSTOM_PATH"):
-        path = Path(custom_path)
+        path = Path(custom_path).expanduser()
+    else:
+        cli_path = Path.home() / ".tbr_deal_finder"
+        if sys.platform == "win32":
+            # Windows: C:\Users\Username\AppData\Local\AppAuthor\AppName
+            base = os.environ.get("LOCALAPPDATA", os.path.expanduser("~\\AppData\\Local"))
+            gui_path = Path(base) / app_author / app_name
 
-    elif not is_gui_env():
-        path = Path.home() / ".tbr_deal_finder"
+        elif sys.platform == "darwin":
+            # macOS: ~/Library/Application Support/AppName
+            gui_path = Path.home() / "Library" / "Application Support" / app_name
 
-    elif sys.platform == "win32":
-        # Windows: C:\Users\Username\AppData\Local\AppAuthor\AppName
-        base = os.environ.get("LOCALAPPDATA", os.path.expanduser("~\\AppData\\Local"))
-        path = Path(base) / app_author / app_name
+        else:  # Linux and others
+            # Linux: ~/.local/share/appname (following XDG spec)
+            xdg_data_home = os.environ.get("XDG_DATA_HOME",
+                                           os.path.expanduser("~/.local/share"))
+            gui_path = Path(xdg_data_home) / app_name.lower()
 
-    elif sys.platform == "darwin":
-        # macOS: ~/Library/Application Support/AppName
-        path = Path.home() / "Library" / "Application Support" / app_name
-
-    else:  # Linux and others
-        # Linux: ~/.local/share/appname (following XDG spec)
-        xdg_data_home = os.environ.get("XDG_DATA_HOME",
-                                       os.path.expanduser("~/.local/share"))
-        path = Path(xdg_data_home) / app_name.lower()
+        if is_gui_env():
+            path = gui_path
+            if cli_path.exists() and not path.exists():
+                # Use the cli path if it exists and the gui path does not
+                path = cli_path
+        else:
+            path = cli_path
+            if gui_path.exists() and not path.exists():
+                # Use the gui path if it exists and the cli path does not
+                path = gui_path
 
     # Create directory if it doesn't exist
     path.mkdir(parents=True, exist_ok=True)
