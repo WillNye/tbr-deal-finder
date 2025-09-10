@@ -3,6 +3,13 @@
 
 ---
 
+## 0.3.3 (September 10, 2025)
+
+BUG FIXES:
+* Fixed Mac app cert 
+
+---
+
 ## 0.3.2 (September 8, 2025)
 
 Notes: 
