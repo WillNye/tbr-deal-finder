@@ -43,14 +43,27 @@ jobs:
     - name: Import Code Signing Certificate (if available)
       if: ${{ env.HAS_MACOS_CERTIFICATE == 'true' }}
       run: |
+        set -e  # Exit on any error
+        
         # Create temporary keychain
         security create-keychain -p "temp_keychain_password" temp.keychain
         security default-keychain -s temp.keychain
         security unlock-keychain -p "temp_keychain_password" temp.keychain
         
-        # Import certificate
+        # Set keychain settings to avoid timeout
+        security set-keychain-settings -t 3600 -u temp.keychain
+        
+        # Import certificate with empty password
         echo "${{ secrets.MACOS_CERTIFICATE }}" | base64 --decode > certificate.p12
-        security import certificate.p12 -k temp.keychain -T /usr/bin/codesign
+        
+        # Verify the certificate file exists and has content
+        if [ ! -s certificate.p12 ]; then
+            echo "❌ Certificate file is empty or missing"
+            exit 1
+        fi
+        
+        # Import with explicitly empty password
+        security import certificate.p12 -k temp.keychain -P "" -T /usr/bin/codesign -A
         
         # Allow codesign to access the certificate
         security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "temp_keychain_password" temp.keychain
@@ -63,6 +76,11 @@ jobs:
         else
             # Auto-detect identity from certificate
             CERT_IDENTITY=$(security find-identity -v -p codesigning temp.keychain | head -1 | grep -o '"[^"]*"' | tr -d '"')
+            if [ -z "$CERT_IDENTITY" ]; then
+                echo "❌ No code signing identity found in keychain"
+                security find-identity -v temp.keychain  # Show what's in the keychain for debugging
+                exit 1
+            fi
             echo "CODESIGN_IDENTITY=$CERT_IDENTITY" >> $GITHUB_ENV
             echo "✅ Code signing certificate imported (auto-detected): $CERT_IDENTITY"
         fi
