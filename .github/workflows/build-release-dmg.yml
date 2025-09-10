@@ -12,7 +12,6 @@ jobs:
     runs-on: macos-latest
     env:
       HAS_MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE != '' }}
-      HAS_MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD != '' }}
       VERSION: ${{ github.event.release.tag_name }}
     
     steps:
@@ -42,7 +41,7 @@ jobs:
         version: latest
 
     - name: Import Code Signing Certificate (if available)
-      if: ${{ env.HAS_MACOS_CERTIFICATE == 'true' && env.HAS_MACOS_CERTIFICATE_PASSWORD == 'true' }}
+      if: ${{ env.HAS_MACOS_CERTIFICATE == 'true' }}
       run: |
         # Create temporary keychain
         security create-keychain -p "temp_keychain_password" temp.keychain
@@ -51,7 +50,7 @@ jobs:
         
         # Import certificate
         echo "${{ secrets.MACOS_CERTIFICATE }}" | base64 --decode > certificate.p12
-        security import certificate.p12 -k temp.keychain -P "${{ secrets.MACOS_CERTIFICATE_PASSWORD }}" -T /usr/bin/codesign
+        security import certificate.p12 -k temp.keychain -T /usr/bin/codesign
         
         # Allow codesign to access the certificate
         security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "temp_keychain_password" temp.keychain
@@ -76,7 +75,7 @@ jobs:
         make build-mac
         
     - name: Cleanup Code Signing
-      if: ${{ env.HAS_MACOS_CERTIFICATE == 'true' && env.HAS_MACOS_CERTIFICATE_PASSWORD == 'true' }}
+      if: ${{ env.HAS_MACOS_CERTIFICATE == 'true' }}
       run: |
         # Remove temporary keychain
         security delete-keychain temp.keychain || true
