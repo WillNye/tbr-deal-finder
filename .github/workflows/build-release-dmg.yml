@@ -41,7 +41,7 @@ jobs:
       with:
         version: latest
 
-- name: Import Code Signing Certificate (if available)
+    - name: Import Code Signing Certificate (if available)
       if: ${{ env.HAS_MACOS_CERTIFICATE == 'true' && env.HAS_MACOS_CERTIFICATE_PASSWORD == 'true' }}
       run: |
         set -e  # Exit on any error
