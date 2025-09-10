@@ -50,109 +50,27 @@ jobs:
         KEYCHAIN_PASSWORD="temp_keychain_password"
         KEYCHAIN_NAME="temp.keychain-db"
         
-        echo "Creating temporary keychain..."
         security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_NAME"
         security default-keychain -s "$KEYCHAIN_NAME"
         security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_NAME"
         security set-keychain-settings -t 3600 -u "$KEYCHAIN_NAME"
         
-        # Method 1: Try with different base64 decode options
-        echo "Decoding PKCS12 certificate (Method 1: standard decode)..."
+        # Decode PKCS12 certificate
         echo "${{ secrets.MACOS_CERTIFICATE }}" | base64 --decode > certificate.p12
         
-        # Verify file size and properties
-        echo "Certificate file info:"
-        ls -la certificate.p12
-        file certificate.p12
-        echo "File size: $(wc -c < certificate.p12) bytes"
-        echo "First 16 bytes (hex): $(xxd -l 16 -p certificate.p12)"
-        
-        # PKCS12 files should start with specific bytes
-        if xxd -l 4 -p certificate.p12 | grep -q "^3082"; then
-            echo "✓ File appears to be a valid PKCS12 (starts with 3082)"
-        else
-            echo "⚠️  File may not be a valid PKCS12 format"
-            echo "Attempting alternate decode method..."
-            
-            # Method 2: Try cleaning the base64 string first
-            echo "${{ secrets.MACOS_CERTIFICATE }}" | tr -d ' \n\r' | base64 --decode > certificate2.p12
-            if [ -s certificate2.p12 ]; then
-                mv certificate2.p12 certificate.p12
-                echo "Used cleaned base64 decode"
-            fi
+        # Verify file exists and has content
+        if [ ! -s certificate.p12 ]; then
+            echo "❌ Certificate file is empty or missing"
+            exit 1
         fi
         
-        # Try to verify with OpenSSL first (this might give us more info)
-        echo "Verifying PKCS12 with OpenSSL..."
-        if openssl pkcs12 -in certificate.p12 -passin pass:"${{ secrets.MACOS_CERTIFICATE_PASSWORD }}" -noout -info 2>&1; then
-            echo "✓ OpenSSL can read the PKCS12 file"
-        else
-            echo "❌ OpenSSL cannot read the PKCS12 file"
-            echo "OpenSSL error details:"
-            openssl pkcs12 -in certificate.p12 -passin pass:"${{ secrets.MACOS_CERTIFICATE_PASSWORD }}" -noout -info 2>&1 || true
-            
-            # Try with empty password as a test
-            echo "Testing with empty password..."
-            openssl pkcs12 -in certificate.p12 -passin pass: -noout -info 2>&1 || true
-            
-            # Check if it's actually a PEM file that got base64 encoded
-            echo "Checking if it's a PEM file..."
-            head -1 certificate.p12
-        fi
-        
-        # Method 3: Try importing with different security options
-        echo "Importing PKCS12 to keychain..."
-        
-        # First attempt: Standard import
-        if ! security import certificate.p12 \
+        # Import PKCS12 to keychain (specifying format explicitly is required)
+        echo "Importing certificate..."
+        security import certificate.p12 \
             -k "$KEYCHAIN_NAME" \
             -P "${{ secrets.MACOS_CERTIFICATE_PASSWORD }}" \
-            -T /usr/bin/codesign \
-            -T /usr/bin/security \
-            -A 2>&1; then
-            
-            echo "Standard import failed, trying without -A flag..."
-            
-            # Second attempt: Without -A flag
-            if ! security import certificate.p12 \
-                -k "$KEYCHAIN_NAME" \
-                -P "${{ secrets.MACOS_CERTIFICATE_PASSWORD }}" \
-                -T /usr/bin/codesign 2>&1; then
-                
-                echo "Import without -A failed, trying with -f flag..."
-                
-                # Third attempt: With format specified
-                if ! security import certificate.p12 \
-                    -k "$KEYCHAIN_NAME" \
-                    -P "${{ secrets.MACOS_CERTIFICATE_PASSWORD }}" \
-                    -f pkcs12 \
-                    -T /usr/bin/codesign 2>&1; then
-                    
-                    echo "❌ All import attempts failed"
-                    
-                    # Last resort: Try to extract and import separately
-                    echo "Attempting to extract certificate and key separately..."
-                    
-                    # Extract certificate
-                    if openssl pkcs12 -in certificate.p12 -passin pass:"${{ secrets.MACOS_CERTIFICATE_PASSWORD }}" -nokeys -out cert.pem 2>/dev/null; then
-                        echo "Extracted certificate"
-                        
-                        # Extract key
-                        if openssl pkcs12 -in certificate.p12 -passin pass:"${{ secrets.MACOS_CERTIFICATE_PASSWORD }}" -nocerts -nodes -out key.pem 2>/dev/null; then
-                            echo "Extracted key"
-                            
-                            # Import separately
-                            security import cert.pem -k "$KEYCHAIN_NAME" -T /usr/bin/codesign
-                            security import key.pem -k "$KEYCHAIN_NAME" -T /usr/bin/codesign
-                            
-                            echo "✓ Imported certificate and key separately"
-                        fi
-                    fi
-                fi
-            fi
-        else
-            echo "✓ Certificate imported successfully"
-        fi
+            -f pkcs12 \
+            -T /usr/bin/codesign
         
         # Allow codesign to access the certificate
         security set-key-partition-list \
@@ -160,11 +78,6 @@ jobs:
             -s \
             -k "$KEYCHAIN_PASSWORD" \
             "$KEYCHAIN_NAME" 2>/dev/null || true
-        
-        # Check what's in the keychain
-        echo "Checking keychain contents..."
-        security find-identity -v "$KEYCHAIN_NAME"
-        security find-identity -v -p codesigning "$KEYCHAIN_NAME"
         
         # Set code signing identity
         if [ -n "${{ secrets.CODESIGN_IDENTITY }}" ]; then
@@ -174,20 +87,21 @@ jobs:
             # Auto-detect identity from certificate
             CERT_IDENTITY=$(security find-identity -v -p codesigning "$KEYCHAIN_NAME" | grep -v "0 valid identities" | head -1 | awk -F'"' '{print $2}')
             if [ -z "$CERT_IDENTITY" ]; then
-                echo "⚠️  No code signing identity found, checking all identities..."
+                # Fallback to any identity if no codesigning specific one found
                 CERT_IDENTITY=$(security find-identity -v "$KEYCHAIN_NAME" | grep -v "0 valid identities" | head -1 | awk -F'"' '{print $2}')
-                
-                if [ -z "$CERT_IDENTITY" ]; then
-                    echo "❌ No identity found at all"
-                    exit 1
-                fi
             fi
+            
+            if [ -z "$CERT_IDENTITY" ]; then
+                echo "❌ No signing identity found"
+                exit 1
+            fi
+            
             echo "CODESIGN_IDENTITY=$CERT_IDENTITY" >> $GITHUB_ENV
             echo "✅ Code signing certificate imported (auto-detected): $CERT_IDENTITY"
         fi
         
         # Clean up
-        rm -f certificate.p12 cert.pem key.pem
+        rm -f certificate.p12
 
     - name: Build DMG
       run: |
