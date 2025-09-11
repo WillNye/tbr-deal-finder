@@ -1,6 +1,10 @@
 import asyncio
 import os
 import base64
+import subprocess
+import sys
+from datetime import datetime
+from pathlib import Path
 
 import flet as ft
 
@@ -17,6 +21,7 @@ from tbr_deal_finder.gui.pages.all_deals import AllDealsPage
 from tbr_deal_finder.gui.pages.latest_deals import LatestDealsPage
 from tbr_deal_finder.gui.pages.all_books import AllBooksPage
 from tbr_deal_finder.gui.pages.book_details import BookDetailsPage
+from tbr_deal_finder.utils import get_duckdb_conn, get_latest_deal_last_ran
 
 
 class TBRDealFinderApp:
@@ -27,7 +32,8 @@ class TBRDealFinderApp:
         self.selected_book = None
         self.update_info = None  # Store update information
         self.nav_disabled = False  # Track navigation disabled state
-        
+        self._last_run_time = None
+
         # Initialize pages
         self.settings_page = SettingsPage(self)
         self.all_deals_page = AllDealsPage(self)
@@ -295,10 +301,9 @@ class TBRDealFinderApp:
             self.all_books_page.refresh_page_state()
     
     def refresh_all_pages(self):
-        """Refresh all pages by clearing their state and reloading data"""
+        """Refresh all pages except all_books_page by clearing their state and reloading data"""
         self.all_deals_page.refresh_page_state()
         self.latest_deals_page.refresh_page_state()
-        self.all_books_page.refresh_page_state()
 
     def disable_navigation(self):
         """Disable navigation rail during background operations"""
@@ -621,10 +626,6 @@ class TBRDealFinderApp:
         def close_dialog(e):
             dialog.open = False
             self.page.update()
-        
-        def view_release_and_close(e):
-            self.view_release_notes(e)
-            close_dialog(e)
             
         def download_and_close(e):
             self.download_update(e)
@@ -638,10 +639,13 @@ class TBRDealFinderApp:
             ], spacing=10),
             content=ft.Column([
                 ft.Text(f"Version {self.update_info['version']} is now available!"),
-                ft.Text("Would you like to download the update?", color=ft.Colors.GREY_600)
-            ], spacing=10, tight=True),
+                ft.Divider(),
+                ft.Text(
+                    self.update_info.get('release_notes', 'No release notes available.'),
+                    selectable=True
+                ),
+            ], scroll=ft.ScrollMode.AUTO, spacing=10, tight=True),
             actions=[
-                ft.TextButton("View Release Notes", on_click=view_release_and_close),
                 ft.ElevatedButton("Download Update", on_click=download_and_close),
                 ft.TextButton("Later", on_click=close_dialog),
             ],
@@ -675,24 +679,36 @@ class TBRDealFinderApp:
         dialog.open = True
         self.page.update()
 
-    def view_release_notes(self, e):
-        """Open release notes in browser."""
-        if self.update_info:
-            import webbrowser
-            webbrowser.open(self.update_info['release_url'])
-
     def download_update(self, e):
         """Handle update download."""
         if not self.update_info or not self.update_info.get('download_url'):
             return
-        
-        # For now, open download URL in browser
-        # In a more advanced implementation, you could download in-app
-        import webbrowser
-        webbrowser.open(self.update_info['download_url'])
-        
-        # Show download instructions
-        self.show_download_instructions()
+
+        if sys.platform == "darwin":
+            dmg_path = Path(
+                f"~/Downloads/TBR-Deal-Finder-{self.update_info['version']}-mac.dmg"
+            ).expanduser()
+
+            # Show download instructions
+            self.show_download_instructions()
+
+            if not dmg_path.exists():
+                # Using curl or urllib to download to prevent Mac warning
+                subprocess.run([
+                    "curl", "-L",
+                    self.update_info['download_url'],
+                    "-o", dmg_path
+                ])
+
+            subprocess.run(["open", dmg_path])
+        else:
+            # For now, open download URL in browser
+            # In a more advanced implementation, you could download in-app
+            import webbrowser
+            webbrowser.open(self.update_info['download_url'])
+
+            # Show download instructions
+            self.show_download_instructions()
 
     def show_download_instructions(self):
         """Show instructions for installing the downloaded update."""
@@ -701,7 +717,7 @@ class TBRDealFinderApp:
             self.page.update()
         
         instructions = {
-            "darwin": "1. Download will start in your browser\n2. Open the downloaded .dmg file\n3. Drag the app to Applications folder\n4. Restart the application",
+            "darwin": "1. Wait for the update to download (can take a minute or 2)\n2. Close TBR Deal Finder\n3. Once the installer opens, drag the app to Applications folder\n3. When prompted, select Replace\n4. Restart the application",
             "windows": "1. Download will start in your browser\n2. Run the downloaded .exe installer\n3. Follow the installation wizard\n4. Restart the application",
         }
         
@@ -732,11 +748,19 @@ class TBRDealFinderApp:
         dialog.open = True
         self.page.update()
 
-
-
     def check_for_updates_button(self):
         """Check for updates when button is clicked."""
         self.check_for_updates_manual()
+
+    def update_last_run_time(self):
+        db_conn = get_duckdb_conn()
+        self._last_run_time = get_latest_deal_last_ran(db_conn)
+
+    def get_last_run_time(self) -> datetime:
+        if not self._last_run_time:
+            self.update_last_run_time()
+
+        return self._last_run_time
 
 
 def main():
