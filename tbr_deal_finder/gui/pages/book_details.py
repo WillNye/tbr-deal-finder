@@ -11,7 +11,7 @@ from tbr_deal_finder.utils import get_duckdb_conn, execute_query, float_to_curre
 logger = logging.getLogger(__name__)
 
 
-def build_book_price_section(historical_data: list[dict]) -> ft.Column:
+def build_book_price_section(max_dt: datetime, historical_data: list[dict]) -> ft.Column:
     retailer_data = dict()
     available_colors = [
         ft.Colors.AMBER,
@@ -27,7 +27,6 @@ def build_book_price_section(historical_data: list[dict]) -> ft.Column:
     min_price = None
     max_price = None
     min_time = None
-    max_dt = datetime.now()
     max_time = max_dt.timestamp()
 
     for record in historical_data:
@@ -461,7 +460,7 @@ class BookDetailsPage:
             )
         
         # Create the chart
-        chart_fig = build_book_price_section(self.historical_data)
+        chart_fig = build_book_price_section(self.app.get_last_run_time(), self.historical_data)
         
         return ft.Container(
             content=ft.Column([

@@ -10,7 +10,6 @@ from tbr_deal_finder.gui.pages.base_book_page import BaseBookPage
 class LatestDealsPage(BaseBookPage):
     def __init__(self, app):
         super().__init__(app, 4)
-        self.last_run_time = None
         
     def get_page_title(self) -> str:
         return "Latest Deals"
@@ -27,7 +26,7 @@ class LatestDealsPage(BaseBookPage):
     
     def build(self):
         """Build the latest deals page with custom header"""
-        self.check_last_run()
+        self.app.update_last_run_time()
         
         # Custom header with run button
         header = self.build_header()
@@ -73,15 +72,16 @@ class LatestDealsPage(BaseBookPage):
     def build_header(self):
         """Build the header with run button and status"""
         can_run = self.can_run_latest_deals()
-        
-        if not can_run and self.last_run_time:
-            next_run_time = self.last_run_time + timedelta(hours=8)
+        last_run_time = self.app.get_last_run_time()
+
+        if not can_run and last_run_time:
+            next_run_time = last_run_time + timedelta(hours=8)
             time_remaining = next_run_time - datetime.now()
             hours_remaining = max(0, int(time_remaining.total_seconds() / 3600))
             status_text = f"Next run available in {hours_remaining} hours"
             status_color = ft.Colors.ORANGE
-        elif self.last_run_time:
-            status_text = f"Last run: {self.last_run_time.strftime('%Y-%m-%d %H:%M')}"
+        elif last_run_time:
+            status_text = f"Last run: {last_run_time.strftime('%Y-%m-%d %H:%M')}"
             status_color = ft.Colors.GREEN
         else:
             status_text = "No previous runs"
@@ -194,11 +194,13 @@ class LatestDealsPage(BaseBookPage):
 
     def load_items(self):
         """Load deals found at the last run time"""
-        if self.last_run_time:
+        last_run_time = self.app.get_last_run_time()
+
+        if last_run_time:
             try:
                 self.items = [
                     book
-                    for book in get_deals_found_at(self.last_run_time)
+                    for book in get_deals_found_at(last_run_time)
                     if is_qualifying_deal(self.app.config, book)
                 ]
                 self.apply_filters()
@@ -237,19 +239,15 @@ class LatestDealsPage(BaseBookPage):
             )
         )
 
-    def check_last_run(self):
-        """Check when deals were last run"""
-        if not self.last_run_time:
-            db_conn = get_duckdb_conn()
-            self.last_run_time = get_latest_deal_last_ran(db_conn)
-
     def can_run_latest_deals(self) -> bool:
         """Check if latest deals can be run (8 hour cooldown)"""
-        if not self.last_run_time:
+        last_run_time = self.app.get_last_run_time()
+
+        if not last_run_time:
             return True
         
         min_age = datetime.now() - timedelta(hours=8)
-        return self.last_run_time < min_age
+        return last_run_time < min_age
 
     def run_latest_deals(self, e):
         """Run the latest deals check"""
@@ -286,7 +284,7 @@ class LatestDealsPage(BaseBookPage):
             
             if success:
                 # Update the run time and load new deals
-                self.last_run_time = self.app.config.run_time
+                self.app.update_last_run_time()
                 self.load_items()
                 self.show_success(f"Found {len(self.items)} new deals!")
             else:
@@ -300,7 +298,7 @@ class LatestDealsPage(BaseBookPage):
             self.is_loading = False
             self.progress_container.visible = False
             self.run_button.disabled = False
-            self.check_last_run()  # Refresh the status
+            self.app.update_last_run_time()  # Refresh the status
             
             # Re-enable navigation after the operation
             self.app.enable_navigation()
@@ -372,5 +370,5 @@ class LatestDealsPage(BaseBookPage):
             self.format_dropdown.value = "All"
         
         # Check last run and reload data
-        self.check_last_run()
+        self.app.update_last_run_time()
         self.load_items()
