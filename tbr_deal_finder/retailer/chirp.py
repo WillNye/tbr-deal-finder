@@ -57,7 +57,7 @@ class Chirp(AioHttpSession, Retailer):
                 auth_info = json.load(f)
                 if auth_info:
                     token_created_at = datetime.fromtimestamp(auth_info["created_at"])
-                    max_token_age = datetime.now() - timedelta(days=7)
+                    max_token_age = datetime.now() - timedelta(days=14)
                     if token_created_at > max_token_age:
                         self.auth_token = auth_info["data"]["signIn"]["user"]["token"]
                         return True

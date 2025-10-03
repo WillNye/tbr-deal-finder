@@ -62,7 +62,7 @@ class LibroFM(AioHttpSession, Retailer):
             with open(self.auth_path, "r") as f:
                 auth_info = json.load(f)
                 token_created_at = datetime.fromtimestamp(auth_info["created_at"])
-                max_token_age = datetime.now() - timedelta(days=7)
+                max_token_age = datetime.now() - timedelta(days=14)
                 if token_created_at > max_token_age:
                     self.auth_token = auth_info["access_token"]
                     return True
