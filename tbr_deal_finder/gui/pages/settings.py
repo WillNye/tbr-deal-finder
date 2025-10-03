@@ -16,6 +16,7 @@ class SettingsPage:
         self.max_price = 8.0
         self.min_discount = 30
         self.locale = "us"
+        self.is_kindle_unlimited_member = False
         
         # Create file picker once and add to page overlay
         self.file_picker = ft.FilePicker(on_result=self.on_file_picker_result)
@@ -31,6 +32,7 @@ class SettingsPage:
             self.max_price = self.config.max_price
             self.min_discount = self.config.min_discount
             self.locale = self.config.locale
+            self.is_kindle_unlimited_member = self.config.is_kindle_unlimited_member
         except FileNotFoundError:
             self.library_paths = []
             self.tracked_retailers = list(RETAILER_MAP.keys())
@@ -87,6 +89,18 @@ class SettingsPage:
                 on_change=lambda e, r=retailer: self.toggle_retailer(r, e.control.value)
             )
             retailer_checkboxes.append(checkbox)
+
+        # Kindle Unlimited membership checkbox (indented to appear nested under Kindle)
+        self.kindle_unlimited_checkbox = ft.Container(
+            content=ft.Checkbox(
+                label="Are you an active Kindle Unlimited member?",
+                value=self.is_kindle_unlimited_member,
+                on_change=self.update_kindle_unlimited_membership,
+            ),
+            margin=ft.margin.only(left=30),
+            visible=bool("Kindle" in self.tracked_retailers),
+        )
+        retailer_checkboxes.append(self.kindle_unlimited_checkbox)
 
         retailers_section = ft.Container(
             content=ft.Column([
@@ -264,6 +278,11 @@ class SettingsPage:
         elif not is_checked and retailer in self.tracked_retailers:
             self.tracked_retailers.remove(retailer)
 
+        if retailer == "Kindle":
+            self.kindle_unlimited_checkbox.visible = is_checked
+            self.app.page.update()
+
+
     def update_max_price(self, e):
         """Update max price value"""
         try:
@@ -278,6 +297,10 @@ class SettingsPage:
         except ValueError:
             pass
 
+    def update_kindle_unlimited_membership(self, e):
+        """Update Kindle Unlimited membership status"""
+        self.is_kindle_unlimited_member = e.control.value
+
     def save_config(self, e):
         """Save the configuration"""
         if not self.tracked_retailers:
@@ -291,6 +314,7 @@ class SettingsPage:
                 self.config.tracked_retailers = self.tracked_retailers
                 self.config.max_price = self.max_price
                 self.config.min_discount = self.min_discount
+                self.config.is_kindle_unlimited_member = self.is_kindle_unlimited_member
                 self.config.set_locale(self.locale)
             else:
                 # Create new config
@@ -298,7 +322,8 @@ class SettingsPage:
                     library_export_paths=self.library_paths,
                     tracked_retailers=self.tracked_retailers,
                     max_price=self.max_price,
-                    min_discount=self.min_discount
+                    min_discount=self.min_discount,
+                    is_kindle_unlimited_member=self.is_kindle_unlimited_member
                 )
                 self.config.set_locale(self.locale)
 
