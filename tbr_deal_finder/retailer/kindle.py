@@ -105,7 +105,8 @@ class Kindle(Amazon):
                         target.list_price = action["offer"]["printListPrice"]["value"]
                         target.current_price = action["offer"]["digitalPrice"]["value"]
                         target.exists = True
-                        break
+                    elif action.get("actionProgram", {}).get("programCode") == "KINDLE_UNLIMITED":
+                        target.alt_price = 0
 
                 # The sleep is a pre-emptive backoff
                 # Concurrency is already low, but this endpoint loves to throttle

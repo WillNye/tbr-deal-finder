@@ -50,6 +50,8 @@ class Book:
         self.current_price = current_price
         self.normalized_authors = get_normalized_authors(authors)
 
+        self._alt_price = None
+
         if isinstance(format, str):
             format = BookFormat(format)
         self.format = format
@@ -79,6 +81,14 @@ class Book:
     @current_price.setter
     def current_price(self, price: float):
         self._current_price = round(price, 2)
+
+    @property
+    def alt_price(self) -> Union[float, None]:
+        return self._alt_price
+
+    @alt_price.setter
+    def alt_price(self, price: float):
+        self._alt_price = round(price, 2)
 
     @property
     def list_price(self) -> float:

@@ -158,6 +158,13 @@ def _set_config() -> Config:
         echo_err("Config setup cancelled.")
         sys.exit(0)
 
+    if "Kindle" in config.tracked_retailers:
+        config.is_kindle_unlimited_member = click.prompt(
+            "Are you an active Kindle Unlimited member?",
+            type=bool,
+            default=config.is_kindle_unlimited_member
+        )
+
     _set_locale(config)
 
     config.max_price = click.prompt(

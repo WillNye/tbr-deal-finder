@@ -41,7 +41,12 @@ class Audible(Amazon):
                     continue
                 try:
                     target.list_price = product["price"]["list_price"]["base"]
+                    target.alt_price = product["price"]["ws4v_upsell_price"]["base"]
                     target.current_price = product["price"]["lowest_price"]["base"]
+                    for plan in product.get("plans", []):
+                        if "Minerva" in plan.get("plan_name"):
+                            target.current_price = 0
+
                     target.exists = True
                     return target
                 except KeyError:

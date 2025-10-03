@@ -3,6 +3,19 @@
 
 ---
 
+## 0.3.4 (October 3, 2025)
+
+Notes:
+* Added whispersync pricing to Audible
+  * Works on owned books and Kindle Unlimited books (if you're a Kindle Unlimited member)
+* Audible books now show as free if they are in the Audible plus catalog
+* Kindle books now show as free if they are in the Kindle Unlimited catalog
+  * Requirement: You must be a member and marked that you are in settings 
+* Reduced frequency required to re-authenticate with Libro.FM
+* Reduced frequency required to re-authenticate with Chirp
+
+---
+
 ## 0.3.3 (September 10, 2025)
 
 Notes: 

@@ -28,6 +28,7 @@ class Config:
     max_price: float = 8.0
     min_discount: int = 30
     run_time: datetime = datetime.now()
+    is_kindle_unlimited_member: bool = False
     
     locale: str = "us"  # This will be set as a class attribute below
 
@@ -72,7 +73,8 @@ class Config:
             max_price=parser.getfloat('DEFAULT', 'max_price', fallback=8.0),  
             min_discount=parser.getint('DEFAULT', 'min_discount', fallback=35),
             library_export_paths=library_export_paths,
-            tracked_retailers=[i.strip() for i in tracked_retailers_str.split(",")]
+            tracked_retailers=[i.strip() for i in tracked_retailers_str.split(",")],
+            is_kindle_unlimited_member=parser.getboolean('DEFAULT', 'is_kindle_unlimited_member', fallback=False)
         )
 
     @property
@@ -115,7 +117,8 @@ class Config:
             'min_discount': str(self.min_discount),
             'locale': type(self).locale,
             'library_export_paths': self.library_export_paths_str,
-            'tracked_retailers': self.tracked_retailers_str
+            'tracked_retailers': self.tracked_retailers_str,
+            'is_kindle_unlimited_member': str(self.is_kindle_unlimited_member)
         }
         
         with open(_CONFIG_PATH, 'w') as f:
