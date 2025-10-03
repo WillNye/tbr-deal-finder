@@ -78,7 +78,13 @@ class LatestDealsPage(BaseBookPage):
             next_run_time = last_run_time + timedelta(hours=8)
             time_remaining = next_run_time - datetime.now()
             hours_remaining = max(0, int(time_remaining.total_seconds() / 3600))
-            status_text = f"Next run available in {hours_remaining} hours"
+            if hours_remaining > 1:
+                status_text = f"Next run available in {hours_remaining} hours"
+            elif hours_remaining == 1:
+                status_text = "Next run available in 1 hour"
+            else:
+                remaining_minutes = int(time_remaining.total_seconds() / 60)
+                status_text = f"Next run available in {remaining_minutes} minutes"
             status_color = ft.Colors.ORANGE
         elif last_run_time:
             status_text = f"Last run: {last_run_time.strftime('%Y-%m-%d %H:%M')}"
