@@ -6,6 +6,7 @@ import pandas as pd
 
 from tbr_deal_finder.book import Book, get_active_deals, BookFormat
 from tbr_deal_finder.config import Config
+from tbr_deal_finder.owned_books import get_owned_books
 from tbr_deal_finder.tracked_books import get_tbr_books, get_unknown_books, set_unknown_books
 from tbr_deal_finder.retailer import RETAILER_MAP
 from tbr_deal_finder.retailer.models import Retailer
@@ -139,6 +140,43 @@ def _apply_proper_list_prices(books: list[Book]):
             book.list_price = max(book.current_price, list_price)
 
 
+async def _apply_proper_current_price_audible(config: Config, books: list[Book]):
+    if not config.is_kindle_unlimited_member:
+        return
+
+    whispersync_books = {
+        b.full_title_str for b
+        in await get_owned_books(config)
+        if b.retailer == "Kindle"
+    }
+    for b in books:
+        if b.retailer == "Kindle" and b.alt_price == 0:
+            whispersync_books.add(b.full_title_str)
+
+    for b in books:
+        if (
+            b.retailer == "Audible"
+            and b.alt_price is not None
+            and b.current_price > b.alt_price
+            and b.full_title_str in whispersync_books
+        ):
+            b.current_price = b.alt_price
+
+
+async def _apply_proper_current_price_kindle(config: Config, books: list[Book]):
+    if not config.is_kindle_unlimited_member:
+        return
+
+    for b in books:
+        if b.retailer == "Kindle" and b.alt_price is not None:
+            b.current_price = b.alt_price
+
+
+async def _apply_proper_current_price(config: Config, books: list[Book]):
+    await _apply_proper_current_price_audible(config, books)
+    await _apply_proper_current_price_kindle(config, books)
+
+
 def _get_retailer_relevant_tbr_books(
     retailer: Retailer,
     books: list[Book],
@@ -203,6 +241,7 @@ async def _get_latest_deals(config: Config):
         unknown_books.extend(u_books)
 
     _apply_proper_list_prices(books)
+    await _apply_proper_current_price(config, books)
     update_retailer_deal_table(config, books)
     set_unknown_books(config, unknown_books)
 
