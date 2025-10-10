@@ -2,7 +2,7 @@ import flet as ft
 from abc import ABC, abstractmethod
 from typing import List, Any
 
-from tbr_deal_finder.book import Book, BookFormat
+from tbr_deal_finder.book import Book, BookFormat, get_normalized_authors
 
 
 class BaseBookPage(ABC):
@@ -208,7 +208,7 @@ class BaseBookPage(ABC):
         query = query.lower()
         return [
             item for item in items
-            if query in item.title.lower() or query in str(item.normalized_authors)
+            if query in item.title.lower() or get_normalized_authors(query)[0] in str(item.normalized_authors)
         ]
 
     def filter_by_format(self, items: List[Book], format_filter: str) -> List[Book]:

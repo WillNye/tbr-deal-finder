@@ -141,17 +141,16 @@ def _apply_proper_list_prices(books: list[Book]):
 
 
 async def _apply_proper_current_price_audible(config: Config, books: list[Book]):
-    if not config.is_kindle_unlimited_member:
-        return
-
     whispersync_books = {
         b.full_title_str for b
         in await get_owned_books(config)
         if b.retailer == "Kindle"
     }
-    for b in books:
-        if b.retailer == "Kindle" and b.alt_price == 0:
-            whispersync_books.add(b.full_title_str)
+
+    if config.is_kindle_unlimited_member:
+        for b in books:
+            if b.retailer == "Kindle" and b.alt_price == 0:
+                whispersync_books.add(b.full_title_str)
 
     for b in books:
         if (
