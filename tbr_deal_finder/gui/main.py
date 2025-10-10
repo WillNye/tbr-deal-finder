@@ -20,6 +20,7 @@ from tbr_deal_finder.gui.pages.settings import SettingsPage
 from tbr_deal_finder.gui.pages.all_deals import AllDealsPage
 from tbr_deal_finder.gui.pages.latest_deals import LatestDealsPage
 from tbr_deal_finder.gui.pages.all_books import AllBooksPage
+from tbr_deal_finder.gui.pages.owned_books import OwnedBooksPage
 from tbr_deal_finder.gui.pages.book_details import BookDetailsPage
 from tbr_deal_finder.utils import get_duckdb_conn, get_latest_deal_last_ran
 
@@ -39,6 +40,7 @@ class TBRDealFinderApp:
         self.all_deals_page = AllDealsPage(self)
         self.latest_deals_page = LatestDealsPage(self)
         self.all_books_page = AllBooksPage(self)
+        self.owned_books_page = OwnedBooksPage(self)
         self.book_details_page = BookDetailsPage(self)
         
         self.setup_page()
@@ -191,6 +193,11 @@ class TBRDealFinderApp:
                     selected_icon=ft.Icons.LOCAL_LIBRARY_OUTLINED,
                     label="My Books"
                 ),
+                ft.NavigationRailDestination(
+                    icon=ft.Icons.BOOK,
+                    selected_icon=ft.Icons.BOOK_OUTLINED,
+                    label="Owned Books"
+                ),
             ],
             on_change=self.nav_changed,
             expand=True  # This allows NavigationRail to expand within the Column
@@ -268,14 +275,14 @@ class TBRDealFinderApp:
         # Prevent navigation if disabled
         if self.nav_disabled:
             # Reset to current page selection to prevent visual change
-            current_indices = {"all_deals": 0, "latest_deals": 1, "all_books": 2}
+            current_indices = {"all_deals": 0, "latest_deals": 1, "all_books": 2, "owned_books": 3}
             self.nav_rail.selected_index = current_indices.get(self.current_page, 0)
             # Reapply disabled state after page update
             self.nav_rail.disabled = True
             self.page.update()
             return
             
-        destinations = ["all_deals", "latest_deals", "all_books"]
+        destinations = ["all_deals", "latest_deals", "all_books", "owned_books"]
         if e.control.selected_index < len(destinations):
             self.current_page = destinations[e.control.selected_index]
             
@@ -299,6 +306,8 @@ class TBRDealFinderApp:
             self.latest_deals_page.refresh_page_state()
         elif self.current_page == "all_books":
             self.all_books_page.refresh_page_state()
+        elif self.current_page == "owned_books":
+            self.owned_books_page.refresh_page_state()
     
     def refresh_all_pages(self):
         """Refresh all pages except all_books_page by clearing their state and reloading data"""
@@ -333,6 +342,8 @@ class TBRDealFinderApp:
             return self.latest_deals_page.build()
         elif self.current_page == "all_books":
             return self.all_books_page.build()
+        elif self.current_page == "owned_books":
+            return self.owned_books_page.build()
         elif self.current_page == "book_details":
             return self.book_details_page.build()
         elif self.current_page == "settings":
