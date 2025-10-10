@@ -3,6 +3,16 @@
 
 ---
 
+## 0.3.5 (October 10, 2025)
+
+Notes:
+* Added the ability to view owned books (GUI Only)
+
+BUG FIXES:
+* Fixed issue where whispersync pricing wouldn't show if user owned kindle book and was NOT an audible member
+* Fixed gui book filter when searching by author
+---
+
 ## 0.3.4 (October 3, 2025)
 
 Notes:
