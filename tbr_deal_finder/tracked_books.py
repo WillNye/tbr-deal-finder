@@ -104,9 +104,9 @@ async def _get_raw_tbr_books(config: Config) -> list[Book]:
 
     response: list[Book] = []
 
-    owned_book_title_map: dict[str, set] = defaultdict(set)
+    owned_book_title_map: dict[str, dict] = defaultdict(dict[BookFormat, str])
     for book in owned_books:
-        owned_book_title_map[book.full_title_str].add(book.format)
+        owned_book_title_map[book.full_title_str][book.format] = book.retailer
 
     for book in raw_tbr_books:
         owned_formats = owned_book_title_map.get(book.full_title_str)
@@ -120,6 +120,31 @@ async def _get_raw_tbr_books(config: Config) -> list[Book]:
         elif tracking_ebooks and BookFormat.EBOOK not in owned_formats:
             book.format = BookFormat.EBOOK
             response.append(book)
+
+    if config.is_kindle_unlimited_member:
+        tbr_ebooks = {
+            book.full_title_str
+            for book in response
+            if book.format == BookFormat.EBOOK
+        }
+        internal_books = []
+        for book in response:
+            owned_formats = owned_book_title_map.get(book.full_title_str)
+
+            if (
+                book.format != BookFormat.AUDIOBOOK
+                or book.full_title_str in tbr_ebooks
+                or (owned_formats and "Kindle" not in owned_formats[BookFormat.EBOOK])
+            ):
+                continue
+
+            # Check for whispersync pricing
+            internal_book = copy.deepcopy(book)
+            internal_book.format = BookFormat.EBOOK
+            internal_book.is_internal = True
+            internal_books.append(internal_book)
+
+        response.extend(internal_books)
 
     return response
 

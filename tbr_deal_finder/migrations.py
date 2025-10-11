@@ -88,6 +88,20 @@ _MIGRATIONS = [
             );
             """
     ),
+    TableMigration(
+        version=2,
+        table_name="tbr_book",
+        sql="""
+            ALTER TABLE tbr_book ADD COLUMN is_internal BOOLEAN DEFAULT FALSE;
+            """
+    ),
+    TableMigration(
+        version=2,
+        table_name="retailer_deal",
+        sql="""
+            ALTER TABLE retailer_deal ADD COLUMN is_internal BOOLEAN DEFAULT FALSE;
+            """
+    ),
 ]
 
 
