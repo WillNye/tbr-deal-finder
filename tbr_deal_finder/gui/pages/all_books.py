@@ -45,7 +45,10 @@ class AllBooksPage(BaseBookPage):
         try:
             # Run the async operation directly
             await self.app.auth_all_configured_retailers()
-            self.items = await get_tbr_books(self.app.config)
+            items = await get_tbr_books(self.app.config)
+            self.items = [
+                i for i in items if not i.is_internal
+            ]
             self.apply_filters()
         except Exception as e:
             logger.error(f"Error loading TBR books: {e}")

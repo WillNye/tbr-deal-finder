@@ -34,6 +34,7 @@ class Book:
         audiobook_list_price: float = 0,
         deleted: bool = False,
         exists: bool = True,
+        is_internal: bool = False,
     ):
         self.retailer = retailer
         self.title = get_normalized_title(title)
@@ -45,6 +46,12 @@ class Book:
         self.audiobook_list_price = audiobook_list_price
         self.deleted = deleted
         self.exists = exists
+
+        # Used but not REALLY tracked by the user
+        # Example: We need to keep track of Kindle Unlimited for DCC for whispersync
+        #   However, only the user only has DCC on their Audible wishlist
+        #   We don't want to show the Kindle deal for the ebook but we need it for Audible pricing
+        self.is_internal = is_internal
 
         self.list_price = list_price
         self.current_price = current_price
@@ -123,6 +130,7 @@ class Book:
             "format": self.format.value,
             "deleted": self.deleted,
             "deal_id": self.deal_id,
+            "is_internal": self.is_internal,
         }
 
     def tbr_dict(self):
@@ -134,6 +142,7 @@ class Book:
             "audiobook_isbn": self.audiobook_isbn,
             "audiobook_list_price": self.audiobook_list_price,
             "book_id": self.title_id,
+            "is_internal": self.is_internal,
         }
 
     def unknown_book_dict(self):
