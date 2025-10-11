@@ -130,7 +130,7 @@ class Chirp(AioHttpSession, Retailer):
         return True
 
     async def get_book(
-        self, target: Book, semaphore: asyncio.Semaphore
+        self, config: Config, target: Book, semaphore: asyncio.Semaphore
     ) -> Union[Book, None]:
         title = target.title
         async with semaphore:

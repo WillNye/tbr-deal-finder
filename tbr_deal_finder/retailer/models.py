@@ -60,7 +60,7 @@ class Retailer(abc.ABC):
         raise NotImplementedError
 
     async def get_book(
-            self, target: Book, semaphore: asyncio.Semaphore
+            self, config: Config, target: Book, semaphore: asyncio.Semaphore
     ) -> Union[Book, None]:
         """Get book information from the retailer.
 
@@ -69,6 +69,7 @@ class Retailer(abc.ABC):
         - Returns a Book with exists=False if the book is not found
 
         Args:
+            config: Current user's config
             target: Book object containing search criteria
             runtime: Timestamp for when the search was initiated
             semaphore: Semaphore to control concurrent requests

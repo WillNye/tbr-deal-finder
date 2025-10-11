@@ -19,6 +19,7 @@ class Audible(Amazon):
 
     async def get_book(
         self,
+        config: Config,
         target: Book,
         semaphore: asyncio.Semaphore
     ) -> Union[Book, None]:
@@ -43,9 +44,11 @@ class Audible(Amazon):
                     target.list_price = product["price"]["list_price"]["base"]
                     target.alt_price = product["price"]["ws4v_upsell_price"]["base"]
                     target.current_price = product["price"]["lowest_price"]["base"]
-                    for plan in product.get("plans", []):
-                        if "Minerva" in plan.get("plan_name"):
-                            target.current_price = 0
+
+                    if config.is_audible_plus_member:
+                        for plan in product.get("plans", []):
+                            if "Minerva" in plan.get("plan_name"):
+                                target.current_price = 0
 
                     target.exists = True
                     return target

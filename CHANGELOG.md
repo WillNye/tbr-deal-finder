@@ -8,6 +8,9 @@
 Notes:
 * Added the ability to view owned books (GUI Only)
 * Audible Whispersync now supported for wishlists
+* Ability to select if user is active audible plus member
+  * If user is not an active member, no longer show audible plus books as free
+* Hardcover.app support for TBR exports
 
 BUG FIXES:
 * Fixed issue where whispersync pricing wouldn't show if user owned kindle book and was NOT an audible member

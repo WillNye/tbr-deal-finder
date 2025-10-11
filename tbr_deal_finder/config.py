@@ -28,7 +28,10 @@ class Config:
     max_price: float = 8.0
     min_discount: int = 30
     run_time: datetime = datetime.now()
+
+    # Both of these are only used if tracking deals on Audible
     is_kindle_unlimited_member: bool = False
+    is_audible_plus_member: bool = True
     
     locale: str = "us"  # This will be set as a class attribute below
 
@@ -74,7 +77,8 @@ class Config:
             min_discount=parser.getint('DEFAULT', 'min_discount', fallback=35),
             library_export_paths=library_export_paths,
             tracked_retailers=[i.strip() for i in tracked_retailers_str.split(",")],
-            is_kindle_unlimited_member=parser.getboolean('DEFAULT', 'is_kindle_unlimited_member', fallback=False)
+            is_kindle_unlimited_member=parser.getboolean('DEFAULT', 'is_kindle_unlimited_member', fallback=False),
+            is_audible_plus_member=parser.getboolean('DEFAULT', 'is_audible_plus_member', fallback=True)
         )
 
     @property
@@ -118,7 +122,8 @@ class Config:
             'locale': type(self).locale,
             'library_export_paths': self.library_export_paths_str,
             'tracked_retailers': self.tracked_retailers_str,
-            'is_kindle_unlimited_member': str(self.is_kindle_unlimited_member)
+            'is_kindle_unlimited_member': str(self.is_kindle_unlimited_member),
+            'is_audible_plus_member': str(self.is_audible_plus_member)
         }
         
         with open(_CONFIG_PATH, 'w') as f:

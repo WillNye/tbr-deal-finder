@@ -59,7 +59,7 @@ def _set_library_export_paths(config: Config):
     """
     Interactively set the paths to the user's library export files.
 
-    Allows the user to add or remove paths to their StoryGraph, Goodreads, or custom CSV export files.
+    Allows the user to add or remove paths to their StoryGraph, Goodreads, Hardcover, or custom CSV export files.
     Ensures that only valid, unique paths are added. Updates the config in-place.
     """
     while True:
@@ -79,8 +79,8 @@ def _set_library_export_paths(config: Config):
         if user_selection == "Done":
             if not config.library_export_paths:
                 if not click.confirm(
-                    "Don't add a GoodReads or StoryGraph export and use wishlist entirely? "
-                    "Note: Wishlist checks will still work even if you add your StoryGraph/GoodReads export."
+                    "Don't add a GoodReads, StoryGraph or Hardcover export and use wishlist entirely? "
+                    "Note: Wishlist checks will still work even if you add your StoryGraph/GoodReads/Hardcover export."
                 ):
                     continue
             return
@@ -163,6 +163,13 @@ def _set_config() -> Config:
             "Are you an active Kindle Unlimited member?",
             type=bool,
             default=config.is_kindle_unlimited_member
+        )
+
+    if "Audible" in config.tracked_retailers:
+        config.is_audible_plus_member = click.prompt(
+            "Are you an active Audible Plus member?",
+            type=bool,
+            default=config.is_audible_plus_member
         )
 
     _set_locale(config)

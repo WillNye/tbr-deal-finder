@@ -54,6 +54,13 @@ Before using the app, export your reading lists:
 1. Visit [Goodreads Export](https://www.goodreads.com/review/import)
 2. Click "Export Library" → Wait for email → Download CSV
 
+#### Hardcover
+* Visit [Hardcover](https://hardcover.app/account/exports)
+* In the center of your page click the button "Generate Export"
+* Wait a few minutes and refresh the page
+* A new line item will appear, including a section called "Download"
+* Click the button for the most recent export to download the csv
+
 #### Custom CSV
 Create your own with these columns:
 - `Title` (required)

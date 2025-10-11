@@ -21,6 +21,7 @@ A data file containing a user's reading list and status. Sources include:
 - **Automated Exports**:
   - The StoryGraph
   - Goodreads
+  - Hardcover
 - **Manual CSVs**: Custom spreadsheets following the required format
 
 ### TBR (To Be Read)

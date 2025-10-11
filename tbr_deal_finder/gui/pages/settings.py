@@ -17,6 +17,7 @@ class SettingsPage:
         self.min_discount = 30
         self.locale = "us"
         self.is_kindle_unlimited_member = False
+        self.is_audible_plus_member = True
         
         # Create file picker once and add to page overlay
         self.file_picker = ft.FilePicker(on_result=self.on_file_picker_result)
@@ -33,6 +34,7 @@ class SettingsPage:
             self.min_discount = self.config.min_discount
             self.locale = self.config.locale
             self.is_kindle_unlimited_member = self.config.is_kindle_unlimited_member
+            self.is_audible_plus_member = self.config.is_audible_plus_member
         except FileNotFoundError:
             self.library_paths = []
             self.tracked_retailers = list(RETAILER_MAP.keys())
@@ -55,7 +57,7 @@ class SettingsPage:
         library_section = ft.Container(
             content=ft.Column([
                 ft.Text("Library Export Paths", size=18, weight=ft.FontWeight.BOLD),
-                ft.Text("Add your StoryGraph or Goodreads export files", color=ft.Colors.GREY_600),
+                ft.Text("Add your StoryGraph, Goodreads, or Hardcover export files", color=ft.Colors.GREY_600),
                 self.library_paths_list,
                 ft.Row([
                     ft.ElevatedButton(
@@ -80,6 +82,16 @@ class SettingsPage:
             border_radius=8
         )
 
+        self.audible_plus_checkbox = ft.Container(
+            content=ft.Checkbox(
+                label="Are you an active Audible Plus member?",
+                value=self.is_audible_plus_member,
+                on_change=self.update_audible_plus_membership,
+            ),
+            margin=ft.margin.only(left=30),
+            visible=bool("Audible" in self.tracked_retailers),
+        )
+
         # Tracked Retailers Section
         retailer_checkboxes = []
         for retailer in RETAILER_MAP.keys():
@@ -89,6 +101,10 @@ class SettingsPage:
                 on_change=lambda e, r=retailer: self.toggle_retailer(r, e.control.value)
             )
             retailer_checkboxes.append(checkbox)
+
+            if retailer == "Audible":
+                # Audible Plus membership checkbox (indented to appear nested under Audible)
+                retailer_checkboxes.append(self.audible_plus_checkbox)
 
         # Kindle Unlimited membership checkbox (indented to appear nested under Kindle)
         self.kindle_unlimited_checkbox = ft.Container(
@@ -281,6 +297,9 @@ class SettingsPage:
         if retailer == "Kindle":
             self.kindle_unlimited_checkbox.visible = is_checked
             self.app.page.update()
+        elif retailer == "Audible":
+            self.audible_plus_checkbox.visible = is_checked
+            self.app.page.update()
 
 
     def update_max_price(self, e):
@@ -301,6 +320,10 @@ class SettingsPage:
         """Update Kindle Unlimited membership status"""
         self.is_kindle_unlimited_member = e.control.value
 
+    def update_audible_plus_membership(self, e):
+        """Update Audible Plus membership status"""
+        self.is_audible_plus_member = e.control.value
+
     def save_config(self, e):
         """Save the configuration"""
         if not self.tracked_retailers:
@@ -315,6 +338,7 @@ class SettingsPage:
                 self.config.max_price = self.max_price
                 self.config.min_discount = self.min_discount
                 self.config.is_kindle_unlimited_member = self.is_kindle_unlimited_member
+                self.config.is_audible_plus_member = self.is_audible_plus_member
                 self.config.set_locale(self.locale)
             else:
                 # Create new config
@@ -323,7 +347,8 @@ class SettingsPage:
                     tracked_retailers=self.tracked_retailers,
                     max_price=self.max_price,
                     min_discount=self.min_discount,
-                    is_kindle_unlimited_member=self.is_kindle_unlimited_member
+                    is_kindle_unlimited_member=self.is_kindle_unlimited_member,
+                    is_audible_plus_member=self.is_audible_plus_member
                 )
                 self.config.set_locale(self.locale)
 
