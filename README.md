@@ -4,7 +4,7 @@
 Track price drops and find deals on books in your TBR (To Be Read) and wishlist across digital book retailers.
 
 ## Features
-- Use your StoryGraph exports, Goodreads exports, and custom csvs (spreadsheet) to track book deals
+- Use your StoryGraph exports, Goodreads exports, Hardcover exports, and custom csvs (spreadsheet) to track book deals
 - Supports multiple library exports
 - Tracks deals on the wishlist of all your configured retailers like audible (excluding kindle)
 - Supports multiple locales
@@ -59,6 +59,13 @@ Here are the steps to get your export.
 * Wait a few minutes and refresh the page
 * A new item will appear that says "Your export from ..." will appear
 * Click it to download the csv
+
+### Hardcover
+* Open https://hardcover.app/account/exports in the browser of your choice
+* In the center of your page click the button "Generate Export"
+* Wait a few minutes and refresh the page
+* A new line item will appear, including a section called "Download"
+* Click the button for the most recent export to download the csv
 
 ### Custom csv
 If you've got your own CSV you're using to track your TBRs all you need are the following columns for it to be in a valid format

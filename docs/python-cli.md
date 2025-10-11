@@ -380,7 +380,7 @@ pip install --pre tbr-deal-finder
 
 ### Optimize Your Reading Lists
 - **Keep Updated**: Remove purchased books regularly
-- **Multiple Sources**: Combine StoryGraph, Goodreads, and custom lists
+- **Multiple Sources**: Combine StoryGraph, Goodreads, Hardcover, and custom lists
 - **Series Tracking**: Include upcoming books in series you follow
 
 ### Configuration Best Practices

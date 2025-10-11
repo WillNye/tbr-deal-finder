@@ -96,7 +96,7 @@ async def _get_raw_tbr_books(config: Config) -> list[Book]:
     tracking_ebooks = config.is_tracking_format(book_format=BookFormat.EBOOK)
 
     tbr_book_map: dict[str: Book] = {}
-    # Get TBRs specified in the user library (StoryGraph/GoodReads) export
+    # Get TBRs specified in the user library (StoryGraph/GoodReads/Hardcover) export
     _library_export_tbr_books(config, tbr_book_map)
     # Pull wishlist from tracked retailers
     await _retailer_wishlist(config, tbr_book_map)
@@ -350,6 +350,8 @@ def is_tbr_book(book: dict) -> bool:
         return book["Read Status"] == "to-read"
     elif "Bookshelves" in book:
         return "to-read" in book["Bookshelves"]
+    elif "Status" in book:
+        return book["Status"] in [None, "None", "Want to Read"]
     else:
         return True
 

@@ -57,7 +57,7 @@ class SettingsPage:
         library_section = ft.Container(
             content=ft.Column([
                 ft.Text("Library Export Paths", size=18, weight=ft.FontWeight.BOLD),
-                ft.Text("Add your StoryGraph or Goodreads export files", color=ft.Colors.GREY_600),
+                ft.Text("Add your StoryGraph, Goodreads, or Hardcover export files", color=ft.Colors.GREY_600),
                 self.library_paths_list,
                 ft.Row([
                     ft.ElevatedButton(
