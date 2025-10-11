@@ -165,6 +165,13 @@ def _set_config() -> Config:
             default=config.is_kindle_unlimited_member
         )
 
+    if "Audible" in config.tracked_retailers:
+        config.is_audible_plus_member = click.prompt(
+            "Are you an active Audible Plus member?",
+            type=bool,
+            default=config.is_audible_plus_member
+        )
+
     _set_locale(config)
 
     config.max_price = click.prompt(

@@ -147,7 +147,7 @@ class LibroFM(AioHttpSession, Retailer):
         return book
 
     async def get_book(
-        self, target: Book, semaphore: asyncio.Semaphore
+        self, config: Config, target: Book, semaphore: asyncio.Semaphore
     ) -> Union[Book, None]:
         if not target.audiobook_isbn:
             target.exists = False

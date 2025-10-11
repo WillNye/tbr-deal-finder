@@ -82,7 +82,7 @@ async def _get_books(
         book.format = retailer.format
 
     tasks = [
-        retailer.get_book(book, semaphore)
+        retailer.get_book(config, book, semaphore)
         for book in books
         if book.deal_id not in ignored_deal_ids
     ]

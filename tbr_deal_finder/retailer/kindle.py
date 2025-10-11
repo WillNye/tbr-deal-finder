@@ -75,6 +75,7 @@ class Kindle(Amazon):
 
     async def get_book(
         self,
+        config: Config,
         target: Book,
         semaphore: asyncio.Semaphore
     ) -> Union[Book, None]:
