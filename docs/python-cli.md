@@ -367,7 +367,7 @@ tbr-deal-finder active-deals | grep -E "^[A-Za-z]" | head -10
 ### Development and Testing
 ```bash
 # Install development version from GitHub
-pip install git+https://github.com/yourusername/tbr-deal-finder.git
+pip install git+https://github.com/WillNye/tbr-deal-finder.git
 
 # Install specific version
 pip install tbr-deal-finder==0.2.1

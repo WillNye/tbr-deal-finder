@@ -33,7 +33,7 @@ Alternative: [UV Installation Guide](https://docs.astral.sh/uv/getting-started/i
 #### Clone and Install
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/tbr-deal-finder.git
+git clone https://github.com/WillNye/tbr-deal-finder.git
 cd tbr-deal-finder
 
 # Install project and all dependencies
@@ -179,7 +179,7 @@ uv run python -c "import pstats; pstats.Stats('profile.prof').sort_stats('cumula
 
 ### Before Contributing
 1. **Fork the repository** on GitHub
-2. **Clone your fork**: `git clone https://github.com/yourusername/tbr-deal-finder.git`
+2. **Clone your fork**: `git clone https://github.com/WillNye/tbr-deal-finder.git`
 3. **Create feature branch**: `git checkout -b feature/description`
 4. **Set up development environment**: `uv sync`
 

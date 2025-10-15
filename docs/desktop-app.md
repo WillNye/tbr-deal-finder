@@ -9,7 +9,7 @@ The desktop app provides a beautiful graphical interface for managing your book 
 ### 🍎 macOS Installation
 
 #### Download & Install
-1. Go to the [latest release](https://github.com/yourusername/tbr-deal-finder/releases/latest)
+1. Go to the [latest release](https://github.com/WillNye/tbr-deal-finder/releases/latest)
 2. Download `TBRDealFinder-{version}-macOS.dmg`
 3. **Open the DMG**: Double-click the downloaded `.dmg` file
 4. **Handle Security Warning**: macOS will show "Cannot verify developer"
@@ -26,7 +26,7 @@ The desktop app provides a beautiful graphical interface for managing your book 
 ### 🪟 Windows Installation
 
 #### Download & Install
-1. Go to the [latest release](https://github.com/yourusername/tbr-deal-finder/releases/latest)
+1. Go to the [latest release](https://github.com/WillNye/tbr-deal-finder/releases/latest)
 2. Download `TBRDealFinder-{version}-Windows.exe`
 3. **Run the Installer**: Double-click the downloaded `.exe` file
 4. **Handle Security Warning**: Windows will show "Unknown publisher"
@@ -81,7 +81,7 @@ Create your own with these columns:
 ### Checking for Updates
 Currently, updates require manual download:
 1. **Check Current Version**: Look in Settings/About section
-2. **Visit Releases**: Go to [latest releases](https://github.com/yourusername/tbr-deal-finder/releases/latest)
+2. **Visit Releases**: Go to [latest releases](https://github.com/WillNye/tbr-deal-finder/releases/latest)
 3. **Compare Versions**: See if a newer version is available
 
 ### Installing Updates
@@ -124,7 +124,7 @@ Don't close the app while getting deals or progress may be lost.
 ## 🆘 Getting Help
 
 ### Community Support
-1. **GitHub Issues**: [Report bugs or ask questions](https://github.com/yourusername/tbr-deal-finder/issues)
+1. **GitHub Issues**: [Report bugs or ask questions](https://github.com/WillNye/tbr-deal-finder/issues)
 2. **Search First**: Someone might have had the same issue
 3. **Provide Details**: Include OS version, error messages, screenshots
 
