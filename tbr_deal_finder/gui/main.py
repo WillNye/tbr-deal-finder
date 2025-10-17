@@ -19,7 +19,7 @@ from tbr_deal_finder.desktop_updater import check_for_desktop_updates
 from tbr_deal_finder.gui.pages.settings import SettingsPage
 from tbr_deal_finder.gui.pages.all_deals import AllDealsPage
 from tbr_deal_finder.gui.pages.latest_deals import LatestDealsPage
-from tbr_deal_finder.gui.pages.all_books import AllBooksPage
+from tbr_deal_finder.gui.pages.wishlist import WishlistPage
 from tbr_deal_finder.gui.pages.owned_books import OwnedBooksPage
 from tbr_deal_finder.gui.pages.book_details import BookDetailsPage
 from tbr_deal_finder.utils import get_duckdb_conn, get_latest_deal_last_ran
@@ -39,7 +39,7 @@ class TBRDealFinderApp:
         self.settings_page = SettingsPage(self)
         self.all_deals_page = AllDealsPage(self)
         self.latest_deals_page = LatestDealsPage(self)
-        self.all_books_page = AllBooksPage(self)
+        self.all_books_page = WishlistPage(self)
         self.owned_books_page = OwnedBooksPage(self)
         self.book_details_page = BookDetailsPage(self)
         
@@ -191,7 +191,7 @@ class TBRDealFinderApp:
                 ft.NavigationRailDestination(
                     icon=ft.Icons.LIBRARY_BOOKS,
                     selected_icon=ft.Icons.LOCAL_LIBRARY_OUTLINED,
-                    label="My Books"
+                    label="Wishlist"
                 ),
                 ft.NavigationRailDestination(
                     icon=ft.Icons.BOOK,
