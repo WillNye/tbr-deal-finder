@@ -30,6 +30,7 @@ class TBRDealFinderApp:
         self.page = page
         self.config = None
         self.current_page = "all_deals"
+        self.previous_page = None  # Track previous page for back navigation
         self.selected_book = None
         self.update_info = None  # Store update information
         self.nav_disabled = False  # Track navigation disabled state
@@ -284,6 +285,10 @@ class TBRDealFinderApp:
             
         destinations = ["all_deals", "latest_deals", "all_books", "owned_books"]
         if e.control.selected_index < len(destinations):
+            # Store current page as previous before changing
+            if self.current_page not in ["book_details", "settings"]:
+                self.previous_page = self.current_page
+            
             self.current_page = destinations[e.control.selected_index]
             
             # Only clear all page states when clicking on Latest Deals
@@ -389,6 +394,10 @@ class TBRDealFinderApp:
 
     def show_book_details(self, book: Book, format_type: BookFormat = None):
         """Show book details page"""
+        # Store current page as previous before navigating to book details
+        if self.current_page not in ["book_details", "settings"]:
+            self.previous_page = self.current_page
+        
         self.selected_book = book
         
         # Set the initial format if specified
@@ -401,6 +410,18 @@ class TBRDealFinderApp:
         self.current_page = "book_details"
         self.nav_rail.selected_index = None
         self.update_content()
+
+    def go_back(self):
+        """Return to the previous page from book details"""
+        if self.previous_page:
+            self.current_page = self.previous_page
+            # Set navigation rail index based on the page
+            nav_indices = {"all_deals": 0, "latest_deals": 1, "all_books": 2, "owned_books": 3}
+            self.nav_rail.selected_index = nav_indices.get(self.current_page, 0)
+            self.update_content()
+        else:
+            # Fallback to all deals if no previous page
+            self.go_back_to_deals()
 
     def go_back_to_deals(self):
         """Return to deals page from book details"""

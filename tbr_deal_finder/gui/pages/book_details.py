@@ -239,18 +239,33 @@ class BookDetailsPage:
         ], spacing=20, scroll=ft.ScrollMode.AUTO)
 
     def build_header(self):
-        """Build the header with book title"""
+        """Build the header with back button and book title"""
         
         title = self.book.title
         if len(title) > 80:
             title = f"{title[:80]}..."
         
-        return ft.Row([
+        # Create smaller back button
+        back_button = ft.IconButton(
+            icon=ft.Icons.ARROW_BACK,
+            tooltip="Go back",
+            on_click=self.go_back,
+            icon_size=20,
+            style=ft.ButtonStyle(
+                color=ft.Colors.ON_SURFACE,
+                overlay_color=ft.Colors.with_opacity(0.1, ft.Colors.ON_SURFACE)
+            )
+        )
+        
+        return ft.Column([
+            ft.Row([
+                back_button
+            ], alignment=ft.MainAxisAlignment.START),
             ft.Column([
                 ft.Text(title, size=24, weight=ft.FontWeight.BOLD),
                 ft.Text(f"by {self.book.authors}", size=16, color=ft.Colors.GREY_600)
             ], spacing=5, expand=True)
-        ], alignment=ft.MainAxisAlignment.START)
+        ], spacing=10)
 
     def get_default_format(self) -> BookFormat:
         """Get the default format for this book, preferring audiobook"""
@@ -601,3 +616,7 @@ class BookDetailsPage:
         """Refresh book data"""
         self.load_book_data()
         self.app.update_content()
+
+    def go_back(self, e=None):
+        """Handle back button click"""
+        self.app.go_back()
