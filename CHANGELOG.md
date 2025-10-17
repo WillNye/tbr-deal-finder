@@ -7,6 +7,7 @@
 
 Notes:
 * Renamed "My Books" to "Wishlist" to improve clarity on the purpose of the page
+* Add a back button to the book details page
 
 ---
 
