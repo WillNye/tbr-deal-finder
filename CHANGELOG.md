@@ -9,6 +9,9 @@ Notes:
 * Renamed "My Books" to "Wishlist" to improve clarity on the purpose of the page
 * Add a back button to the book details page
 
+BUG FIXES:
+* Remove Whispersync pricing from unsupported regions 
+
 ---
 
 ## 0.3.5 (October 10, 2025)

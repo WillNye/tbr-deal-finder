@@ -25,6 +25,7 @@ class Audible(Amazon):
     ) -> Union[Book, None]:
         title = target.title
         authors = target.authors
+        whispersync_support = config.locale not in ["ca"]
 
         async with semaphore:
             match = await self._client.get(
@@ -41,9 +42,11 @@ class Audible(Amazon):
                 if get_normalized_title(product["title"]) != title:
                     continue
                 try:
-                    target.list_price = product["price"]["list_price"]["base"]
-                    target.alt_price = product["price"]["ws4v_upsell_price"]["base"]
                     target.current_price = product["price"]["lowest_price"]["base"]
+                    target.list_price = product["price"]["list_price"]["base"]
+
+                    if whispersync_support:
+                        target.alt_price = product["price"]["ws4v_upsell_price"]["base"]
 
                     if config.is_audible_plus_member:
                         for plan in product.get("plans", []):
