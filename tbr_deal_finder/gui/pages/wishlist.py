@@ -9,12 +9,12 @@ from tbr_deal_finder.gui.pages.base_book_page import BaseBookPage
 logger = logging.getLogger(__name__)
 
 
-class AllBooksPage(BaseBookPage):
+class WishlistPage(BaseBookPage):
     def __init__(self, app):
         super().__init__(app, items_per_page=7)
         
     def get_page_title(self) -> str:
-        return "My Books"
+        return "Wishlist"
     
     def get_empty_state_message(self) -> tuple[str, str]:
         return (
