@@ -21,6 +21,16 @@ _LOCALE_CURRENCY_MAP = {
     "br": "R$",
 }
 
+
+def get_normalized_list(list_val: Union[list, str, None]) -> list:
+    if not list_val:
+        return []
+    elif isinstance(list_val, str):
+        list_val = list_val.split(",")
+
+    return [i.strip() for i in list_val if i]
+
+
 @dataclass
 class Config:
     library_export_paths: list[str]
@@ -36,15 +46,8 @@ class Config:
     locale: str = "us"  # This will be set as a class attribute below
 
     def __post_init__(self):
-        if isinstance(self.library_export_paths, str):
-            self.set_library_export_paths(
-                self.library_export_paths.split(",")
-            )
-
-        if isinstance(self.tracked_retailers, str):
-            self.set_tracked_retailers(
-                self.tracked_retailers.split(",")
-            )
+        self.library_export_paths = get_normalized_list(self.library_export_paths)
+        self.tracked_retailers = get_normalized_list(self.tracked_retailers)
 
     @classmethod
     def currency_symbol(cls) -> str:
@@ -67,16 +70,11 @@ class Config:
         locale = parser.get('DEFAULT', 'locale', fallback="us")
         cls.set_locale(locale)
 
-        if export_paths_str:
-            library_export_paths = [i.strip() for i in export_paths_str.split(",")]
-        else:
-            library_export_paths = []
-
         return cls(
             max_price=parser.getfloat('DEFAULT', 'max_price', fallback=8.0),  
             min_discount=parser.getint('DEFAULT', 'min_discount', fallback=35),
-            library_export_paths=library_export_paths,
-            tracked_retailers=[i.strip() for i in tracked_retailers_str.split(",")],
+            library_export_paths=get_normalized_list(export_paths_str),
+            tracked_retailers=get_normalized_list(tracked_retailers_str),
             is_kindle_unlimited_member=parser.getboolean('DEFAULT', 'is_kindle_unlimited_member', fallback=False),
             is_audible_plus_member=parser.getboolean('DEFAULT', 'is_audible_plus_member', fallback=True)
         )
@@ -98,20 +96,6 @@ class Config:
                 return True
 
         return False
-
-    def set_library_export_paths(self, library_export_paths: Union[str, list[str]]):
-        if not library_export_paths:
-            self.library_export_paths = []
-        elif isinstance(library_export_paths, str):
-            self.library_export_paths = [i.strip() for i in library_export_paths.split(",")]
-        else:
-            self.library_export_paths = library_export_paths
-
-    def set_tracked_retailers(self, tracked_retailers: Union[str, list[str]]):
-        if isinstance(tracked_retailers, str):
-            self.tracked_retailers = [i.strip() for i in tracked_retailers.split(",")]
-        else:
-            self.tracked_retailers = tracked_retailers
 
     def save(self):
         """Save configuration to file."""

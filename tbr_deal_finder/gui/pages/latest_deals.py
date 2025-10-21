@@ -3,7 +3,6 @@ from datetime import datetime, timedelta
 from typing import List
 
 from tbr_deal_finder.book import get_deals_found_at, Book, BookFormat, is_qualifying_deal
-from tbr_deal_finder.utils import get_duckdb_conn, get_latest_deal_last_ran
 from tbr_deal_finder.gui.pages.base_book_page import BaseBookPage
 
 

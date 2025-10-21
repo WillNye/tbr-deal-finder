@@ -95,6 +95,13 @@ class Amazon(Retailer):
             auth.to_file(AUTH_PATH)
 
         self._auth = audible.Authenticator.from_file(AUTH_PATH)
+
+        # Update access token if expired
+        init_token = self._auth.access_token
+        self._auth.refresh_access_token()
+        if init_token != self._auth.access_token:
+            self._auth.to_file(AUTH_PATH)
+
         self._client = audible.AsyncClient(auth=self._auth)
 
     @property

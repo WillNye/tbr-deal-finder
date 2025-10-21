@@ -40,7 +40,7 @@ class TBRDealFinderApp:
         self.settings_page = SettingsPage(self)
         self.all_deals_page = AllDealsPage(self)
         self.latest_deals_page = LatestDealsPage(self)
-        self.all_books_page = WishlistPage(self)
+        self.wishlist_page = WishlistPage(self)
         self.owned_books_page = OwnedBooksPage(self)
         self.book_details_page = BookDetailsPage(self)
         
@@ -276,14 +276,14 @@ class TBRDealFinderApp:
         # Prevent navigation if disabled
         if self.nav_disabled:
             # Reset to current page selection to prevent visual change
-            current_indices = {"all_deals": 0, "latest_deals": 1, "all_books": 2, "owned_books": 3}
+            current_indices = {"all_deals": 0, "latest_deals": 1, "wishlist": 2, "owned_books": 3}
             self.nav_rail.selected_index = current_indices.get(self.current_page, 0)
             # Reapply disabled state after page update
             self.nav_rail.disabled = True
             self.page.update()
             return
             
-        destinations = ["all_deals", "latest_deals", "all_books", "owned_books"]
+        destinations = ["all_deals", "latest_deals", "wishlist", "owned_books"]
         if e.control.selected_index < len(destinations):
             # Store current page as previous before changing
             if self.current_page not in ["book_details", "settings"]:
@@ -309,13 +309,13 @@ class TBRDealFinderApp:
             self.all_deals_page.refresh_page_state()
         elif self.current_page == "latest_deals":
             self.latest_deals_page.refresh_page_state()
-        elif self.current_page == "all_books":
-            self.all_books_page.refresh_page_state()
+        elif self.current_page == "wishlist":
+            self.wishlist_page.refresh_page_state()
         elif self.current_page == "owned_books":
             self.owned_books_page.refresh_page_state()
     
     def refresh_all_pages(self):
-        """Refresh all pages except all_books_page by clearing their state and reloading data"""
+        """Refresh all pages except wishlist_page by clearing their state and reloading data"""
         self.all_deals_page.refresh_page_state()
         self.latest_deals_page.refresh_page_state()
 
@@ -345,8 +345,8 @@ class TBRDealFinderApp:
             return self.all_deals_page.build()
         elif self.current_page == "latest_deals":
             return self.latest_deals_page.build()
-        elif self.current_page == "all_books":
-            return self.all_books_page.build()
+        elif self.current_page == "wishlist":
+            return self.wishlist_page.build()
         elif self.current_page == "owned_books":
             return self.owned_books_page.build()
         elif self.current_page == "book_details":
@@ -416,7 +416,7 @@ class TBRDealFinderApp:
         if self.previous_page:
             self.current_page = self.previous_page
             # Set navigation rail index based on the page
-            nav_indices = {"all_deals": 0, "latest_deals": 1, "all_books": 2, "owned_books": 3}
+            nav_indices = {"all_deals": 0, "latest_deals": 1, "wishlist": 2, "owned_books": 3}
             self.nav_rail.selected_index = nav_indices.get(self.current_page, 0)
             self.update_content()
         else:
@@ -481,7 +481,9 @@ class TBRDealFinderApp:
 
         def close_dialog():
             dialog.open = False
-            self.page.update()
+            self.settings_page.build()
+            self.refresh_all_pages()
+            self.refresh_current_page()
 
         async def handle_submit(e=None):
             form_data = {}
@@ -586,9 +588,53 @@ class TBRDealFinderApp:
                 ft.TextButton("OK", on_click=close_dialog)
             )
 
+        # Exit/stop-tracking confirmation flow
+        def show_stop_tracking_confirmation(e):
+            def close_confirm(_):
+                confirm_dialog.open = False
+                self.refresh_all_pages()
+
+            def confirm_stop_tracking(_):
+                # Remove retailer from tracked list and save config
+                try:
+                    if self.config and retailer.name in self.config.tracked_retailers:
+                        self.config.tracked_retailers = [r for r in self.config.tracked_retailers if r != retailer.name]
+                        self.config.save()
+                        # Notify app config updated and refresh content
+                        self.config_updated(self.config)
+                except Exception:
+                    pass
+
+                # Close both dialogs (confirm and auth)
+                close_confirm(_)
+                close_dialog()
+
+            confirm_dialog = ft.AlertDialog(
+                title=ft.Text(f"Stop tracking {retailer.name}?"),
+                content=ft.Text(
+                    f"If you continue, {retailer.name} will no longer be tracked for deals. You can re-enable it later in Settings.") ,
+                actions=[
+                    ft.ElevatedButton("Yes, stop tracking", on_click=confirm_stop_tracking),
+                    ft.TextButton("No, go back", on_click=close_confirm)
+                ],
+                modal=True
+            )
+
+            self.page.overlay.append(confirm_dialog)
+            confirm_dialog.open = True
+            self.page.update()
+
+        # Build a title row with an exit button (top-right)
+        title_control = None
+        if title:
+            title_control = ft.Row([
+                ft.Text(title),
+                ft.IconButton(icon=ft.Icons.CLOSE, tooltip=f"Stop tracking {retailer.name}", on_click=show_stop_tracking_confirmation)
+            ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN)
+
         # Create dialog
         dialog = ft.AlertDialog(
-            title=ft.Text(title) if title else None,
+            title=title_control,
             content=ft.Column(
                 content_controls,
                 width=400,
