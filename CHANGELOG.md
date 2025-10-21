@@ -8,9 +8,12 @@
 Notes:
 * Renamed "My Books" to "Wishlist" to improve clarity on the purpose of the page
 * Add a back button to the book details page
+* Add exit button when prompted for retailer login
+  * If retailer login is not provided, the retailer will no longer be tracked
 
 BUG FIXES:
 * Remove Whispersync pricing from unsupported regions 
+* Fix issue where expired Amazon access wasn't being updated correctly 
 
 ---
 

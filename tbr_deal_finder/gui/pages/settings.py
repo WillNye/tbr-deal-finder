@@ -27,7 +27,8 @@ class SettingsPage:
     def load_current_config(self):
         """Load current configuration or set defaults"""
         try:
-            self.config = Config.load()
+            if not self.config:
+                self.config = Config.load()
             self.library_paths = self.config.library_export_paths.copy()
             self.tracked_retailers = self.config.tracked_retailers.copy()
             self.max_price = self.config.max_price
@@ -41,7 +42,9 @@ class SettingsPage:
 
     def build(self):
         """Build the settings page content"""
-        
+
+        self.load_current_config()
+
         # Add file picker to page overlay if not already added
         if self.file_picker not in self.app.page.overlay:
             self.app.page.overlay.append(self.file_picker)
