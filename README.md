@@ -13,6 +13,9 @@ Track price drops and find deals on books in your TBR (To Be Read) and wishlist 
 - Filters out books you already own to prevent purchasing the same book on multiple retailers
 - Track historical pricing* (History limited to your runs making it more accurate over time)
 - Compare pricing across digital retailers
+- Whispersync intelligence* (Where available. See FAQ Below for more)
+- Audible Plus & Kindle Unlimited awareness and alerting
+- Centralized place to view all the audiobooks and ebooks you own
 
 ## Support
 
@@ -83,6 +86,16 @@ Each guide contains everything you need: installation, usage, and updating instr
 - [📱 **Desktop App Guide**](docs/desktop-app.md) - For users who prefer graphical interfaces
 - [🐍 **Python CLI Guide**](docs/python-cli.md) - For command-line and automation users
 - [🛠️ **Development Guide**](docs/development.md) - For developers and contributors
+
+## F.A.Q.
+
+### What is Whispersync pricing
+
+Whispersync is Amazon's program that discounts audiobooks when you own the ebook.
+
+The trick: This works with *any* ebook in your library—including Kindle Unlimited books. So you can add a KU ebook (even if you don't want it) to unlock a steep discount on the audiobook.
+
+TBR Deal Finder automatically checks for Whispersync discounts. If you're a Kindle Unlimited member and the ebook is available in KU, it'll show you the discounted Audible price instead of the full price.
 
 ---
 
