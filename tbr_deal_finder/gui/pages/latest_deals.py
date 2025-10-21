@@ -1,12 +1,11 @@
 import flet as ft
 from datetime import datetime, timedelta
-from typing import List
 
 from tbr_deal_finder.book import get_deals_found_at, Book, BookFormat, is_qualifying_deal
-from tbr_deal_finder.gui.pages.base_book_page import BaseBookPage
+from tbr_deal_finder.gui.pages.base_deals_page import BaseDealsPage
 
 
-class LatestDealsPage(BaseBookPage):
+class LatestDealsPage(BaseDealsPage):
     def __init__(self, app):
         super().__init__(app, 4)
         
@@ -120,82 +119,14 @@ class LatestDealsPage(BaseBookPage):
 
     def build_results(self):
         """Build the results section using base class pagination"""
-        # Items list container that we can update without rebuilding search controls
         self.items_container = ft.Container()
         self.pagination_container = ft.Container()
-        
-        # Initial build of items and pagination
         self.update_items_display()
-        
-        return ft.Column([
-            self.items_container,
-            self.pagination_container
-        ], spacing=20)
+        return ft.Column([self.items_container, self.pagination_container], spacing=20)
 
-    def build_items_list(self):
-        """Override base class to handle format grouping with proper pagination"""
-        if self.is_loading:
-            return ft.Container()
-        
-        if not self.filtered_items:
-            main_msg, sub_msg = self.get_empty_state_message()
-            return ft.Container(
-                content=ft.Column([
-                    ft.Icon(ft.Icons.SEARCH, size=64, color=ft.Colors.GREY_400),
-                    ft.Text(main_msg, size=18, color=ft.Colors.GREY_600),
-                    ft.Text(sub_msg, color=ft.Colors.GREY_500)
-                ], alignment=ft.MainAxisAlignment.CENTER, horizontal_alignment=ft.CrossAxisAlignment.CENTER),
-                alignment=ft.alignment.center,
-                height=300
-            )
-        
-        # Apply pagination to all filtered items
-        start_idx = self.current_page * self.items_per_page
-        end_idx = min(start_idx + self.items_per_page, len(self.filtered_items))
-        page_items = self.filtered_items[start_idx:end_idx]
-        
-        # Group page items by format for better organization
-        ebooks = [deal for deal in page_items if deal.format == BookFormat.EBOOK]
-        audiobooks = [deal for deal in page_items if deal.format == BookFormat.AUDIOBOOK]
-        
-        sections = []
-        
-        if ebooks:
-            sections.append(self.build_format_section("E-Book Deals", ebooks))
-        
-        if audiobooks:
-            sections.append(self.build_format_section("Audiobook Deals", audiobooks))
-        
-        if not sections:
-            return ft.Container()
-        
-        return ft.Container(
-            content=ft.Column(sections, spacing=20),
-            padding=10
-        )
+    # Use BaseBookPage.build_items_list for consistent formatting with All Deals
 
-    def build_format_section(self, title: str, deals: List[Book]):
-        """Build a section for a specific format (without pagination - that's handled at the page level)"""
-        deals_tiles = []
-        current_title_id = None
-        for deal in deals:
-            # Add spacing between different books
-            if current_title_id and current_title_id != deal.title_id:
-                deals_tiles.append(ft.Divider())
-            current_title_id = deal.title_id
-            
-            tile = self.create_item_tile(deal)
-            deals_tiles.append(tile)
-        
-        return ft.Container(
-            content=ft.Column([
-                ft.Text(title, size=18, weight=ft.FontWeight.BOLD),
-                ft.Column(deals_tiles, spacing=5)
-            ], spacing=10),
-            padding=15,
-            border=ft.border.all(1, ft.Colors.OUTLINE),
-            border_radius=8
-        )
+    # Format grouping removed to match All Deals formatting
 
     def load_items(self):
         """Load deals found at the last run time"""

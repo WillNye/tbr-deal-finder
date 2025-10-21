@@ -8,6 +8,7 @@
 Notes:
 * Renamed "My Books" to "Wishlist" to improve clarity on the purpose of the page
 * Add a back button to the book details page
+* Clean up the latest deal page format, so the list format is identical to the all books page 
 * Add exit button when prompted for retailer login
   * If retailer login is not provided, the retailer will no longer be tracked
 
