@@ -3,7 +3,7 @@
 
 ---
 
-## 0.3.6 (October XX, 2025)
+## 0.3.6 (October 20, 2025)
 
 Notes:
 * Renamed "My Books" to "Wishlist" to improve clarity on the purpose of the page
