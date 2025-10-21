@@ -257,12 +257,30 @@ class BookDetailsPage:
             )
         )
         
+        # Create copy button for title
+        copy_button = ft.IconButton(
+            icon=ft.Icons.COPY,
+            tooltip="Copy title",
+            on_click=self.copy_title,
+            icon_size=20,
+            style=ft.ButtonStyle(
+                color=ft.Colors.ON_SURFACE,
+                overlay_color=ft.Colors.with_opacity(0.1, ft.Colors.ON_SURFACE)
+            )
+        )
+        
         return ft.Column([
             ft.Row([
                 back_button
             ], alignment=ft.MainAxisAlignment.START),
             ft.Column([
-                ft.Text(title, size=24, weight=ft.FontWeight.BOLD),
+                ft.Row([
+                    ft.Text(title, size=24, weight=ft.FontWeight.BOLD, selectable=True),
+                    ft.Container(
+                        content=copy_button,
+                        padding=ft.padding.only(left=5)
+                    )
+                ], spacing=0, alignment=ft.MainAxisAlignment.START),
                 ft.Text(f"by {self.book.authors}", size=16, color=ft.Colors.GREY_600)
             ], spacing=5, expand=True)
         ], spacing=10)
@@ -616,6 +634,16 @@ class BookDetailsPage:
         """Refresh book data"""
         self.load_book_data()
         self.app.update_content()
+
+    def copy_title(self, e=None):
+        """Handle copy title button click"""
+        try:
+            # Copy the full title to clipboard
+            self.app.page.set_clipboard(self.book.title)
+            # Show a brief confirmation (you could add a snackbar here if desired)
+            logger.info(f"Copied title to clipboard: {self.book.title}")
+        except Exception as ex:
+            logger.error(f"Failed to copy title to clipboard: {ex}")
 
     def go_back(self, e=None):
         """Handle back button click"""
