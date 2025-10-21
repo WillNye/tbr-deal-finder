@@ -3,12 +3,13 @@
 
 ---
 
-## 0.3.6 (October XX, 2025)
+## 0.3.6 (October 20, 2025)
 
 Notes:
 * Renamed "My Books" to "Wishlist" to improve clarity on the purpose of the page
 * Add a back button to the book details page
 * Clean up the latest deal page format, so the list format is identical to the all books page 
+* In Book details, title is now selectable with copy button 
 * Add exit button when prompted for retailer login
   * If retailer login is not provided, the retailer will no longer be tracked
 
