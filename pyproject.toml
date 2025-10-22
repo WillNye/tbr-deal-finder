@@ -1,6 +1,6 @@
 [project]
 name = "tbr-deal-finder"
-version = "0.3.7"
+version = "0.3.8"
 description = "Track price drops and find deals on books in your TBR list across audiobook and ebook formats."
 readme = "README.md"
 requires-python = ">=3.13"
