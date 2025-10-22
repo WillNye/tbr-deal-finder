@@ -3,7 +3,7 @@ import json
 from typing import Union
 
 from tbr_deal_finder.config import Config
-from tbr_deal_finder.retailer.amazon import Amazon, AUTH_PATH
+from tbr_deal_finder.retailer.amazon import Amazon, AUDIBLE_AUTH_PATH
 from tbr_deal_finder.book import Book, BookFormat, get_normalized_title, get_normalized_authors, is_matching_authors
 
 
@@ -33,7 +33,7 @@ class Kindle(Amazon):
     async def set_auth(self):
         await super().set_auth()
 
-        with open(AUTH_PATH, "r") as f:
+        with open(AUDIBLE_AUTH_PATH, "r") as f:
             auth_info = json.load(f)
 
             cookies = auth_info["website_cookies"]
