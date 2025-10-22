@@ -3,18 +3,12 @@
 
 ---
 
-## 0.3.8 (October 22, 2025)
-
-BUG FIXES:
-* Fix issue where Whispersync pricing is still being used in Canada
-
----
-
-## 0.3.7 (October 22, 2025)
+## 0.3.9 (October 22, 2025)
 
 BUG FIXES:
 * Fix issue where the region wasn't being updated on save in Settings page
 * Force user to update their Audible/Kindle credentials if they change their region.  
+* Fix issue where Whispersync pricing is still being used in Canada
 
 ---
 
