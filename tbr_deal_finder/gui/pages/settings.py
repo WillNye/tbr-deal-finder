@@ -15,7 +15,7 @@ class SettingsPage:
         self.tracked_retailers = []
         self.max_price = 8.0
         self.min_discount = 30
-        self.locale = "us"
+        self.locale = Config.locale
         self.is_kindle_unlimited_member = False
         self.is_audible_plus_member = True
         
@@ -33,9 +33,9 @@ class SettingsPage:
             self.tracked_retailers = self.config.tracked_retailers.copy()
             self.max_price = self.config.max_price
             self.min_discount = self.config.min_discount
-            self.locale = self.config.locale
             self.is_kindle_unlimited_member = self.config.is_kindle_unlimited_member
             self.is_audible_plus_member = self.config.is_audible_plus_member
+            self.locale = Config.locale
         except FileNotFoundError:
             self.library_paths = []
             self.tracked_retailers = list(RETAILER_MAP.keys())

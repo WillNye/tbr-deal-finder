@@ -3,6 +3,14 @@
 
 ---
 
+## 0.3.7 (October 22, 2025)
+
+BUG FIXES:
+* Fix issue where the region wasn't being updated on save in Settings page
+* Force user to update their Audible/Kindle credentials if they change their region.  
+
+---
+
 ## 0.3.6 (October 20, 2025)
 
 Notes:

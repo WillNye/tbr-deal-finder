@@ -55,7 +55,16 @@ class Config:
 
     @classmethod
     def set_locale(cls, code: str):
-        cls.locale = code
+        from tbr_deal_finder.retailer.amazon import AUDIBLE_AUTH_PATH
+
+        if code not in _LOCALE_CURRENCY_MAP:
+            raise ValueError(f"Invalid locale code: {code}")
+        elif cls.locale != code:
+            # Wipe region-based credentials
+            if AUDIBLE_AUTH_PATH.exists():
+                AUDIBLE_AUTH_PATH.unlink()
+
+            cls.locale = code
 
     @classmethod
     def load(cls) -> "Config":

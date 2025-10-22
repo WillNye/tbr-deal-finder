@@ -19,7 +19,7 @@ if sys.platform != 'win32':
 from tbr_deal_finder.config import Config
 from tbr_deal_finder.retailer.models import Retailer, GuiAuthContext
 
-AUTH_PATH = get_data_dir().joinpath("audible.json")
+AUDIBLE_AUTH_PATH = get_data_dir().joinpath("audible.json")
 
 logger = logging.getLogger(__name__)
 
@@ -77,10 +77,10 @@ class Amazon(Retailer):
     _client: audible.AsyncClient = None
 
     def user_is_authed(self) -> bool:
-        if not os.path.exists(AUTH_PATH):
+        if not os.path.exists(AUDIBLE_AUTH_PATH):
             return False
 
-        self._auth = audible.Authenticator.from_file(AUTH_PATH)
+        self._auth = audible.Authenticator.from_file(AUDIBLE_AUTH_PATH)
         self._client = audible.AsyncClient(auth=self._auth)
         return True
 
@@ -92,15 +92,15 @@ class Amazon(Retailer):
             )
 
             # Save credentials to file
-            auth.to_file(AUTH_PATH)
+            auth.to_file(AUDIBLE_AUTH_PATH)
 
-        self._auth = audible.Authenticator.from_file(AUTH_PATH)
+        self._auth = audible.Authenticator.from_file(AUDIBLE_AUTH_PATH)
 
         # Update access token if expired
         init_token = self._auth.access_token
         self._auth.refresh_access_token()
         if init_token != self._auth.access_token:
-            self._auth.to_file(AUTH_PATH)
+            self._auth.to_file(AUDIBLE_AUTH_PATH)
 
         self._client = audible.AsyncClient(auth=self._auth)
 
@@ -132,9 +132,9 @@ class Amazon(Retailer):
         try:
             self._auth.external_login(form_data["login_link"])
             # Save credentials to file
-            self._auth.to_file(AUTH_PATH)
+            self._auth.to_file(AUDIBLE_AUTH_PATH)
 
-            self._auth = audible.Authenticator.from_file(AUTH_PATH)
+            self._auth = audible.Authenticator.from_file(AUDIBLE_AUTH_PATH)
             self._client = audible.AsyncClient(auth=self._auth)
             return True
         except Exception as e:
