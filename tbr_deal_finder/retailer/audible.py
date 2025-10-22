@@ -25,7 +25,7 @@ class Audible(Amazon):
     ) -> Union[Book, None]:
         title = target.title
         authors = target.authors
-        whispersync_support = config.locale not in ["ca"]
+        whispersync_support = Config.locale not in ["ca"]
 
         async with semaphore:
             match = await self._client.get(
