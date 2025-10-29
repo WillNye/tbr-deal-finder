@@ -3,6 +3,13 @@
 
 ---
 
+## 0.3.10 (November XX, 2025)
+
+Notes:
+* Add price filter on the "All Deals" page
+
+---
+
 ## 0.3.9 (October 22, 2025)
 
 BUG FIXES:
