@@ -1,3 +1,5 @@
+import math
+
 import flet as ft
 from abc import ABC, abstractmethod
 from typing import List, Any
@@ -16,6 +18,7 @@ class BaseBookPage(ABC):
         self.items_per_page = items_per_page
         self.search_query = ""
         self.format_filter = "All"
+        self.price_filter = app.config.max_price if app.config else 8
         self.is_loading = False
         
     @abstractmethod
@@ -104,14 +107,26 @@ class BaseBookPage(ABC):
         )
         
         controls = [self.search_field, self.format_dropdown]
-        
-        if self.should_include_refresh_button():
-            refresh_button = ft.IconButton(
-                icon=ft.Icons.REFRESH,
-                tooltip="Refresh",
-                on_click=self.refresh_items
+
+        if self.get_page_title() == "All Active Deals":
+            self.price_title = ft.Text(f"Max Price: {self.price_filter}", size=12, text_align=ft.TextAlign.CENTER)
+            self.price_slider = ft.Slider(
+                label="{value}",
+                value=self.price_filter,
+                min=0,
+                max=self.app.config.max_price,
+                divisions=math.ceil(self.app.config.max_price),
+                on_change=self.on_price_change
             )
-            controls.append(refresh_button)
+            price_controls = ft.Column(
+                [
+                    self.price_title,
+                    self.price_slider
+                ],
+                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                spacing=0
+            )
+            controls.append(price_controls)
         
         return ft.Row(controls, spacing=10)
 
@@ -198,6 +213,8 @@ class BaseBookPage(ABC):
         # Apply format filter
         if self.format_filter != "All":
             filtered = self.filter_by_format(filtered, self.format_filter)
+
+        filtered = self.filter_by_price(filtered)
         
         # Apply custom sorting
         self.filtered_items = self.sort_items(filtered)
@@ -222,6 +239,9 @@ class BaseBookPage(ABC):
         
         return [item for item in items if item.format == format_value]
 
+    def filter_by_price(self, items: List[Book]) -> List[Book]:
+        return [item for item in items if item.current_price <= self.price_filter]
+
     def sort_items(self, items: List[Book]) -> List[Book]:
         """Sort items. Override to customize sorting."""
         return sorted(items, key=lambda x: x.deal_id)
@@ -238,9 +258,12 @@ class BaseBookPage(ABC):
         self.apply_filters()
         self.update_items_display()
 
-    def refresh_items(self, e):
-        """Refresh the items list"""
-        self.load_items()
+    def on_price_change(self, e):
+        """Handle price filter changes"""
+        self.price_filter = e.control.value
+        if hasattr(self, 'price_title'):
+            self.price_title.value = f"Max Price: {self.price_filter}"
+        self.apply_filters()
         self.update_items_display()
 
     def prev_page(self, e):

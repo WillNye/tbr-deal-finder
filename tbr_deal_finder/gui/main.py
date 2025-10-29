@@ -36,6 +36,8 @@ class TBRDealFinderApp:
         self.nav_disabled = False  # Track navigation disabled state
         self._last_run_time = None
 
+        self.load_config()
+
         # Initialize pages
         self.settings_page = SettingsPage(self)
         self.all_deals_page = AllDealsPage(self)
@@ -45,7 +47,6 @@ class TBRDealFinderApp:
         self.book_details_page = BookDetailsPage(self)
         
         self.setup_page()
-        self.load_config()
         self.build_layout()
         self.check_for_updates_silently()
 
