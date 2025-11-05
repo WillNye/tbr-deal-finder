@@ -3,7 +3,7 @@
 
 ---
 
-## 0.3.10 (November XX, 2025)
+## 0.3.10 (November 5, 2025)
 
 Notes:
 * Add price filter on the "All Deals" page
