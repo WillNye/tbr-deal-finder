@@ -3,7 +3,18 @@
 
 ---
 
-## 0.3.10 (November XX, 2025)
+## 0.3.11 (December 03, 2025)
+
+Notes:
+* Add the ability to ignore price tracking on books
+
+BUG FIXES:
+* Fix issue where purchased books were still showing in the "all deals" page
+* Fix issue where retailer deals displayed in the "all deals" page after the retailer was removed from user settings
+
+---
+
+## 0.3.10 (November 05, 2025)
 
 Notes:
 * Add price filter on the "All Deals" page

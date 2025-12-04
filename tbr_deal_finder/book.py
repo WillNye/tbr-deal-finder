@@ -1,9 +1,10 @@
 import re
 from datetime import datetime
 from enum import Enum
-from typing import Union
+from typing import Union, Optional
 
 import click
+import duckdb
 from Levenshtein import ratio
 from unidecode import unidecode
 
@@ -35,6 +36,7 @@ class Book:
         deleted: bool = False,
         exists: bool = True,
         is_internal: bool = False,
+        disable_price_tracking: bool = False,
     ):
         self.retailer = retailer
         self.title = get_normalized_title(title)
@@ -52,6 +54,11 @@ class Book:
         #   However, only the user only has DCC on their Audible wishlist
         #   We don't want to show the Kindle deal for the ebook but we need it for Audible pricing
         self.is_internal = is_internal
+
+        # Flag that the book should not be tracked
+        # Example: I have The Lies of Locke Lamora in my TBR
+        #   However, I can get it at the library, so I don't want to see deals on it.
+        self.disable_price_tracking = disable_price_tracking
 
         self.list_price = list_price
         self.current_price = current_price
@@ -143,6 +150,7 @@ class Book:
             "audiobook_list_price": self.audiobook_list_price,
             "book_id": self.title_id,
             "is_internal": self.is_internal,
+            "disable_price_tracking": self.disable_price_tracking,
         }
 
     def unknown_book_dict(self):
@@ -155,8 +163,47 @@ class Book:
         }
 
 
+def update_price_tracking(
+    db_conn: duckdb.DuckDBPyConnection,
+    book: Book,
+):
+    db_conn.execute(
+        "UPDATE tbr_book SET disable_price_tracking = $dpt WHERE book_id = $id",
+        dict(dpt=book.disable_price_tracking, id=book.title_id),
+    )
+    if book.disable_price_tracking:
+        db_conn.execute(
+            "DELETE FROM retailer_deal WHERE title = $title AND authors=$authors",
+            dict(title=book.title, authors=book.authors),
+        )
+
+
+def prune_retailer_deal_table(
+    db_conn: duckdb.DuckDBPyConnection,
+    config: Optional[Config] = None
+):
+    db_conn.execute("""
+    DELETE FROM retailer_deal rd
+    WHERE NOT EXISTS (
+        SELECT 1 
+        FROM tbr_book b 
+        WHERE rd.title = b.title AND rd.authors = b.authors
+    )
+    """)
+
+    if config:
+        db_conn.execute(
+            """
+            DELETE FROM retailer_deal
+            WHERE retailer NOT IN $retailers
+            """,
+            dict(retailers=config.tracked_retailers)
+        )
+
+
 def get_deals_found_at(timepoint: datetime) -> list[Book]:
     db_conn = get_duckdb_conn()
+    prune_retailer_deal_table(db_conn)
     query_response = execute_query(
         db_conn,
         get_query_by_name("get_deals_found_at.sql"),
@@ -167,6 +214,7 @@ def get_deals_found_at(timepoint: datetime) -> list[Book]:
 
 def get_active_deals() -> list[Book]:
     db_conn = get_duckdb_conn()
+    prune_retailer_deal_table(db_conn)
     query_response = execute_query(
         db_conn,
         get_query_by_name("get_active_deals.sql")

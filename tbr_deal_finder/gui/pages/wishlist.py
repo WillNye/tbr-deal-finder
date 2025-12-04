@@ -89,6 +89,12 @@ class WishlistPage(BaseBookPage):
                     subtitle=ft.Column([
                         ft.Text(f"by {book.authors}", color=ft.Colors.GREY_600),
                     ], spacing=2),
+                    trailing=ft.IconButton(
+                        icon=ft.Icons.VISIBILITY if not book.disable_price_tracking else ft.Icons.VISIBILITY_OFF,
+                        tooltip="Toggle price tracking",
+                        on_click=lambda e, b=book: self.show_price_tracking_dialog(b),
+                        icon_size=20
+                    ),
                     on_click=lambda e, b=book: self.app.show_book_details(b, b.format)
                 ),
                 padding=10,

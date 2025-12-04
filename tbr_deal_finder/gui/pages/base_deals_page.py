@@ -28,9 +28,17 @@ class BaseDealsPage(BaseBookPage):
                             ft.Text(f"was {original_price}", color=ft.Colors.GREY_500, size=12)
                         ])
                     ], spacing=2),
-                    trailing=ft.Column([
-                        ft.Text(deal.retailer, weight=ft.FontWeight.BOLD, size=12)
-                    ], alignment=ft.MainAxisAlignment.CENTER),
+                    trailing=ft.Row([
+                        ft.IconButton(
+                            icon=ft.Icons.VISIBILITY,
+                            tooltip="Toggle price tracking",
+                            on_click=lambda e, book=deal: self.show_price_tracking_dialog(book),
+                            icon_size=20
+                        ),
+                        ft.Column([
+                            ft.Text(deal.retailer, weight=ft.FontWeight.BOLD, size=12)
+                        ], alignment=ft.MainAxisAlignment.CENTER)
+                    ], spacing=5, tight=True),
                     on_click=lambda e, book=deal: self.app.show_book_details(book, book.format)
                 ),
                 padding=10,

@@ -2,9 +2,11 @@ from pathlib import Path
 
 import flet as ft
 
+from tbr_deal_finder.book import prune_retailer_deal_table
 from tbr_deal_finder.config import Config
 from tbr_deal_finder.retailer import RETAILER_MAP
 from tbr_deal_finder.tracked_books import reprocess_incomplete_tbr_books, clear_unknown_books
+from tbr_deal_finder.utils import get_duckdb_conn
 
 
 class SettingsPage:
@@ -356,7 +358,10 @@ class SettingsPage:
                 self.config.set_locale(self.locale)
 
             self.config.save()
-            
+            db_conn = get_duckdb_conn()
+            prune_retailer_deal_table(db_conn, self.config)
+            db_conn.close()
+
             # Reprocess books if retailers changed
             reprocess_incomplete_tbr_books(self.config)
             clear_unknown_books()
