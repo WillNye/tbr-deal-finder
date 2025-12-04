@@ -4,7 +4,8 @@ import flet as ft
 from abc import ABC, abstractmethod
 from typing import List, Any
 
-from tbr_deal_finder.book import Book, BookFormat, get_normalized_authors
+from tbr_deal_finder.book import Book, BookFormat, get_normalized_authors, update_price_tracking
+from tbr_deal_finder.utils import get_duckdb_conn
 
 
 class BaseBookPage(ABC):
@@ -311,3 +312,45 @@ class BaseBookPage(ABC):
         
         # Reload data
         self.load_items()
+
+    def show_price_tracking_dialog(self, deal: Book):
+        """Show dialog to enable/disable price tracking for a deal"""
+        # Determine the message based on current state
+        if deal.disable_price_tracking:
+            message = f"Enable price tracking for {deal.title}?"
+        else:
+            message = f"Disable price tracking for {deal.title}?"
+
+        def on_yes(e):
+            # Toggle the disable_price_tracking flag
+            deal.disable_price_tracking = not deal.disable_price_tracking
+
+            # Update the database
+            db_conn = get_duckdb_conn()
+            update_price_tracking(db_conn, deal)
+
+            # Close the dialog
+            dialog.open = False
+            self.app.page.update()
+
+            # Reload items and refresh display
+            self.load_items()
+            self.update_items_display()
+
+        def on_cancel(e):
+            dialog.open = False
+            self.app.page.update()
+
+        dialog = ft.AlertDialog(
+            title=ft.Text("Price Tracking"),
+            content=ft.Text(message),
+            actions=[
+                ft.TextButton("Cancel", on_click=on_cancel),
+                ft.ElevatedButton("Yes", on_click=on_yes)
+            ],
+            modal=True
+        )
+
+        self.app.page.overlay.append(dialog)
+        dialog.open = True
+        self.app.page.update()

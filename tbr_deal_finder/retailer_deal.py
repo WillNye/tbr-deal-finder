@@ -217,6 +217,7 @@ async def _get_latest_deals(config: Config):
     books: list[Book] = []
     unknown_books: list[Book] = []
     tbr_books = await get_tbr_books(config)
+    tbr_books = [b for b in tbr_books if not b.disable_price_tracking]
     ignore_books: list[Book] = get_unknown_books(config)
     ignored_deal_ids: set[str] = {book.deal_id for book in ignore_books}
 

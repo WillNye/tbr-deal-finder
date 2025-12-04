@@ -10,7 +10,7 @@ import questionary
 
 from tbr_deal_finder.config import Config
 from tbr_deal_finder.migrations import make_migrations
-from tbr_deal_finder.book import get_deals_found_at, print_books, get_active_deals
+from tbr_deal_finder.book import get_deals_found_at, print_books, get_active_deals, prune_retailer_deal_table
 from tbr_deal_finder.retailer import RETAILER_MAP
 from tbr_deal_finder.retailer_deal import get_latest_deals
 from tbr_deal_finder.tracked_books import reprocess_incomplete_tbr_books, clear_unknown_books
@@ -186,6 +186,10 @@ def _set_config() -> Config:
     )
 
     config.save()
+    db_conn = get_duckdb_conn()
+    prune_retailer_deal_table(db_conn, config)
+    db_conn.close()
+
     echo_success("Configuration saved!")
 
     return config
