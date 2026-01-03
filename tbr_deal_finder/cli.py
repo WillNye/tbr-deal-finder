@@ -188,7 +188,6 @@ def _set_config() -> Config:
     config.save()
     db_conn = get_duckdb_conn()
     prune_retailer_deal_table(db_conn, config)
-    db_conn.close()
 
     echo_success("Configuration saved!")
 
