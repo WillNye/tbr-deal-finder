@@ -26,6 +26,10 @@ class SettingsPage:
         
         self.load_current_config()
 
+    @staticmethod
+    def page_id():
+        return "settings"
+
     def load_current_config(self):
         """Load current configuration or set defaults"""
         try:
@@ -360,7 +364,6 @@ class SettingsPage:
             self.config.save()
             db_conn = get_duckdb_conn()
             prune_retailer_deal_table(db_conn, self.config)
-            db_conn.close()
 
             # Reprocess books if retailers changed
             reprocess_incomplete_tbr_books(self.config)

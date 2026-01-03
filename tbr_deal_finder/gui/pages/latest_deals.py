@@ -1,13 +1,17 @@
 import flet as ft
 from datetime import datetime, timedelta
 
-from tbr_deal_finder.book import get_deals_found_at, Book, BookFormat, is_qualifying_deal
+from tbr_deal_finder.book import get_deals_found_at, Book, is_qualifying_deal
 from tbr_deal_finder.gui.pages.base_deals_page import BaseDealsPage
 
 
 class LatestDealsPage(BaseDealsPage):
     def __init__(self, app):
         super().__init__(app, 4)
+
+    @staticmethod
+    def page_id():
+        return "latest_deals"
         
     def get_page_title(self) -> str:
         return "Latest Deals"
@@ -166,9 +170,17 @@ class LatestDealsPage(BaseDealsPage):
                         ft.Text(f"by {deal.authors}", color=ft.Colors.GREY_600),
                         ft.Text(price_text, color=ft.Colors.GREEN, weight=ft.FontWeight.BOLD)
                     ], spacing=2),
-                    trailing=ft.Column([
-                        ft.Text(deal.retailer, weight=ft.FontWeight.BOLD, size=12)
-                    ], alignment=ft.MainAxisAlignment.CENTER),
+                    trailing=ft.Row([
+                        ft.IconButton(
+                            icon=ft.Icons.VISIBILITY,
+                            tooltip="Toggle price tracking",
+                            on_click=lambda e, book=deal: self.show_price_tracking_dialog(book),
+                            icon_size=20
+                        ),
+                        ft.Column([
+                            ft.Text(deal.retailer, weight=ft.FontWeight.BOLD, size=12)
+                        ], alignment=ft.MainAxisAlignment.CENTER)
+                    ], spacing=5, tight=True),
                     on_click=lambda e, book=deal: self.app.show_book_details(book, format_type=book.format)
                 ),
                 padding=5

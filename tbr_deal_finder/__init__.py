@@ -1,5 +1,5 @@
 from pathlib import Path
 
-__VERSION__ = "0.3.11"
+__VERSION__ = "0.3.12"
 
 QUERY_PATH = Path(__file__).parent.joinpath("queries")

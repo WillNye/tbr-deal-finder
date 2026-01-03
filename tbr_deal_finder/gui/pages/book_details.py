@@ -198,6 +198,10 @@ class BookDetailsPage:
         self.selected_format = None  # Will be set when book is selected
         self.current_deals = []
         self.historical_data = []
+
+    @staticmethod
+    def page_id():
+        return "book_details"
         
     def build(self):
         """Build the book details page content"""

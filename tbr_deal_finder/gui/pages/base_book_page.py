@@ -21,6 +21,10 @@ class BaseBookPage(ABC):
         self.format_filter = "All"
         self.price_filter = app.config.max_price if app.config else 8
         self.is_loading = False
+
+    @staticmethod
+    def page_id():
+        raise NotImplementedError()
         
     @abstractmethod
     def get_page_title(self) -> str:
@@ -336,6 +340,14 @@ class BaseBookPage(ABC):
             # Reload items and refresh display
             self.load_items()
             self.update_items_display()
+
+            for page in [
+                self.app.wishlist_page,
+                self.app.all_deals_page,
+                self.app.latest_deals_page
+            ]:
+                if self.app.current_page != page.page_id() and page.items:
+                    page.refresh_page_state()
 
         def on_cancel(e):
             dialog.open = False

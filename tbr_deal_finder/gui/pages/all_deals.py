@@ -8,6 +8,10 @@ logger = logging.getLogger(__name__)
 class AllDealsPage(BaseDealsPage):
     def __init__(self, app):
         super().__init__(app, items_per_page=6)
+
+    @staticmethod
+    def page_id():
+        return "all_deals"
         
     def get_page_title(self) -> str:
         return "All Active Deals"

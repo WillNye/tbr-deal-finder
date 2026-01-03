@@ -11,6 +11,10 @@ logger = logging.getLogger(__name__)
 class OwnedBooksPage(BaseBookPage):
     def __init__(self, app):
         super().__init__(app, items_per_page=6)
+
+    @staticmethod
+    def page_id():
+        return "owned_books"
         
     def get_page_title(self) -> str:
         return "My Owned Books"

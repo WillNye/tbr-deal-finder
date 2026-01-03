@@ -4,12 +4,16 @@ import os
 import re
 import sys
 from pathlib import Path
+from threading import Lock
 from typing import Optional
 
 import click
 import duckdb
 
 from tbr_deal_finder import QUERY_PATH
+
+_db_conn = None
+_lock = Lock()
 
 
 @functools.cache
@@ -80,7 +84,22 @@ def float_to_currency(val: float) -> str:
 
 
 def get_duckdb_conn():
-    return duckdb.connect(get_data_dir().joinpath("tbr_deal_finder.db"))
+    global _db_conn
+    db_path = get_data_dir().joinpath("tbr_deal_finder.db")
+    if _db_conn is None:
+        with _lock:
+            if _db_conn is None:
+                _db_conn = duckdb.connect(db_path)
+
+    try:
+        # Test if connection is still valid
+        _db_conn.execute("SELECT 1")
+    except:
+        # Recreate the connection because it's been closed
+        with _lock:
+            _db_conn = duckdb.connect(db_path)
+
+    return _db_conn
 
 
 def execute_query(

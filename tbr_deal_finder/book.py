@@ -168,8 +168,8 @@ def update_price_tracking(
     book: Book,
 ):
     db_conn.execute(
-        "UPDATE tbr_book SET disable_price_tracking = $dpt WHERE book_id = $id",
-        dict(dpt=book.disable_price_tracking, id=book.title_id),
+        "UPDATE tbr_book SET disable_price_tracking = $dpt WHERE title = $title AND authors=$authors",
+        dict(dpt=book.disable_price_tracking, title=book.title, authors=book.authors),
     )
     if book.disable_price_tracking:
         db_conn.execute(

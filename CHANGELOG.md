@@ -3,6 +3,18 @@
 
 ---
 
+## 0.3.12 (January 02, 2026)
+
+Notes:
+* Add the ability to ignore price tracking on books from the "latest deals" page
+
+BUG FIXES:
+* Fix issue where ignore price tracking wasn't working from the "all deals" page
+* Fix syncing of pages when a book is ignoring price tracking
+* Resolve crash errors when closing the desktop app
+
+---
+
 ## 0.3.11 (December 03, 2025)
 
 Notes:
