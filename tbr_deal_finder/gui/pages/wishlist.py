@@ -12,6 +12,10 @@ logger = logging.getLogger(__name__)
 class WishlistPage(BaseBookPage):
     def __init__(self, app):
         super().__init__(app, items_per_page=7)
+
+    @staticmethod
+    def page_id():
+        return "wishlist"
         
     def get_page_title(self) -> str:
         return "Wishlist"
@@ -45,10 +49,11 @@ class WishlistPage(BaseBookPage):
         try:
             # Run the async operation directly
             await self.app.auth_all_configured_retailers()
-            items = await get_tbr_books(self.app.config)
-            self.items = [
-                i for i in items if not i.is_internal
-            ]
+            self.items = await get_tbr_books(
+                self.app.config,
+                True,
+                False,
+            )
             self.apply_filters()
         except Exception as e:
             logger.error(f"Error loading TBR books: {e}")

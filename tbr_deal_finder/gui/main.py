@@ -1,10 +1,12 @@
 import asyncio
+import atexit
 import os
 import base64
 import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 import flet as ft
 
@@ -27,9 +29,12 @@ from tbr_deal_finder.utils import get_duckdb_conn, get_latest_deal_last_ran
 
 class TBRDealFinderApp:
     def __init__(self, page: ft.Page):
+        # Ensure duckdb connection closes gracefully on app close
+        atexit.register(ddb_cleanup)
+
         self.page = page
         self.config = None
-        self.current_page = "all_deals"
+        self.current_page = AllDealsPage.page_id()
         self.previous_page = None  # Track previous page for back navigation
         self.selected_book = None
         self.update_info = None  # Store update information
@@ -49,6 +54,15 @@ class TBRDealFinderApp:
         self.setup_page()
         self.build_layout()
         self.check_for_updates_silently()
+
+    @property
+    def _nav_indices(self):
+        return {
+            self.all_deals_page.page_id(): 0,
+            self.latest_deals_page.page_id(): 1,
+            self.wishlist_page.page_id(): 2,
+            self.owned_books_page.page_id(): 3
+        }
 
     def setup_page(self):
         """Configure the main page settings"""
@@ -107,26 +121,13 @@ class TBRDealFinderApp:
             )
         
         # Create bottom section with logo and update indicator
-        bottom_section_widgets = [logo_widget]
+        bottom_section_widgets: list[Any] = [logo_widget]
         
         # Add update indicator if update is available
         if self.update_info:
-            update_indicator = ft.Container(
-                content=ft.Text(
-                    "Update Available",
-                    size=11,
-                    color=ft.Colors.ORANGE_400,
-                    weight=ft.FontWeight.BOLD,
-                    text_align=ft.TextAlign.CENTER
-                ),
-                padding=ft.padding.only(top=8, left=4, right=4, bottom=4),
-                alignment=ft.alignment.center,
-                on_click=lambda e: self.show_update_notification(),
-                border_radius=4,
-                bgcolor=ft.Colors.ORANGE_50,
-                border=ft.border.all(1, ft.Colors.ORANGE_400)
+            bottom_section_widgets.append(
+                get_update_notification_container()
             )
-            bottom_section_widgets.append(update_indicator)
         
         # Update the bottom container content
         self.nav_container.content.controls[1].content = ft.Column(
@@ -209,26 +210,13 @@ class TBRDealFinderApp:
         self.nav_rail = nav_rail
         
         # Create bottom section with logo and update indicator
-        bottom_section_widgets = [logo_widget]
+        bottom_section_widgets: list[Any] = [logo_widget]
         
         # Add update indicator if update is available
         if self.update_info:
-            update_indicator = ft.Container(
-                content=ft.Text(
-                    "Update Available",
-                    size=11,
-                    color=ft.Colors.ORANGE_400,
-                    weight=ft.FontWeight.BOLD,
-                    text_align=ft.TextAlign.CENTER
-                ),
-                padding=ft.padding.only(top=8, left=4, right=4, bottom=4),
-                alignment=ft.alignment.center,
-                on_click=lambda e: self.show_update_notification(),
-                border_radius=4,
-                bgcolor=ft.Colors.ORANGE_50,
-                border=ft.border.all(1, ft.Colors.ORANGE_400)
+            bottom_section_widgets.append(
+                get_update_notification_container()
             )
-            bottom_section_widgets.append(update_indicator)
         
         # Create navigation container with logo at bottom
         self.nav_container = ft.Container(
@@ -277,24 +265,24 @@ class TBRDealFinderApp:
         # Prevent navigation if disabled
         if self.nav_disabled:
             # Reset to current page selection to prevent visual change
-            current_indices = {"all_deals": 0, "latest_deals": 1, "wishlist": 2, "owned_books": 3}
+            current_indices = self._nav_indices
             self.nav_rail.selected_index = current_indices.get(self.current_page, 0)
             # Reapply disabled state after page update
             self.nav_rail.disabled = True
             self.page.update()
             return
             
-        destinations = ["all_deals", "latest_deals", "wishlist", "owned_books"]
+        destinations = [self.all_deals_page.page_id(), self.latest_deals_page.page_id(), self.wishlist_page.page_id(), self.owned_books_page.page_id()]
         if e.control.selected_index < len(destinations):
             # Store current page as previous before changing
-            if self.current_page not in ["book_details", "settings"]:
+            if self.current_page not in [self.book_details_page.page_id(), self.settings_page.page_id()]:
                 self.previous_page = self.current_page
             
             self.current_page = destinations[e.control.selected_index]
             
             # Only clear all page states when clicking on Latest Deals
             # Other pages maintain their state when navigated to
-            if self.current_page == "latest_deals":
+            if self.current_page == self.latest_deals_page.page_id():
                 self.refresh_all_pages()
             
             self.update_content()
@@ -306,13 +294,13 @@ class TBRDealFinderApp:
     
     def refresh_current_page(self):
         """Refresh the current page by clearing its state and reloading data"""
-        if self.current_page == "all_deals":
+        if self.current_page == self.all_deals_page.page_id():
             self.all_deals_page.refresh_page_state()
-        elif self.current_page == "latest_deals":
+        elif self.current_page == self.latest_deals_page.page_id():
             self.latest_deals_page.refresh_page_state()
-        elif self.current_page == "wishlist":
+        elif self.current_page == self.wishlist_page.page_id():
             self.wishlist_page.refresh_page_state()
-        elif self.current_page == "owned_books":
+        elif self.current_page == self.owned_books_page.page_id():
             self.owned_books_page.refresh_page_state()
     
     def refresh_all_pages(self):
@@ -339,20 +327,20 @@ class TBRDealFinderApp:
 
     def get_current_page_content(self):
         """Get content for the current page"""
-        if self.config is None and self.current_page != "settings":
+        if self.config is None and self.current_page != self.settings_page.page_id():
             return self.get_config_prompt()
         
-        if self.current_page == "all_deals":
+        if self.current_page == self.all_deals_page.page_id():
             return self.all_deals_page.build()
-        elif self.current_page == "latest_deals":
+        elif self.current_page == self.latest_deals_page.page_id():
             return self.latest_deals_page.build()
-        elif self.current_page == "wishlist":
+        elif self.current_page == self.wishlist_page.page_id():
             return self.wishlist_page.build()
-        elif self.current_page == "owned_books":
+        elif self.current_page == self.owned_books_page.page_id():
             return self.owned_books_page.build()
-        elif self.current_page == "book_details":
+        elif self.current_page == self.book_details_page.page_id():
             return self.book_details_page.build()
-        elif self.current_page == "settings":
+        elif self.current_page == self.settings_page.page_id():
             return self.settings_page.build()
         else:
             return ft.Text("Page not found")
@@ -389,14 +377,14 @@ class TBRDealFinderApp:
 
     def show_settings(self, e=None):
         """Show settings page"""
-        self.current_page = "settings"
+        self.current_page = self.settings_page.page_id()
         self.nav_rail.selected_index = None  # Deselect nav items
         self.update_content()
 
     def show_book_details(self, book: Book, format_type: BookFormat = None):
         """Show book details page"""
         # Store current page as previous before navigating to book details
-        if self.current_page not in ["book_details", "settings"]:
+        if self.current_page not in [self.book_details_page.page_id(), self.settings_page.page_id()]:
             self.previous_page = self.current_page
         
         self.selected_book = book
@@ -408,7 +396,7 @@ class TBRDealFinderApp:
             # Reset selected format so it uses default logic
             self.book_details_page.selected_format = None
         
-        self.current_page = "book_details"
+        self.current_page = self.book_details_page.page_id()
         self.nav_rail.selected_index = None
         self.update_content()
 
@@ -417,8 +405,7 @@ class TBRDealFinderApp:
         if self.previous_page:
             self.current_page = self.previous_page
             # Set navigation rail index based on the page
-            nav_indices = {"all_deals": 0, "latest_deals": 1, "wishlist": 2, "owned_books": 3}
-            self.nav_rail.selected_index = nav_indices.get(self.current_page, 0)
+            self.nav_rail.selected_index = self._nav_indices.get(self.current_page, 0)
             self.update_content()
         else:
             # Fallback to all deals if no previous page
@@ -426,7 +413,7 @@ class TBRDealFinderApp:
 
     def go_back_to_deals(self):
         """Return to deals page from book details"""
-        self.current_page = "all_deals"
+        self.current_page = self.all_deals_page.page_id()
         self.nav_rail.selected_index = 0
         # Refresh the page when returning to it
         self.refresh_current_page()
@@ -435,8 +422,8 @@ class TBRDealFinderApp:
     def config_updated(self, new_config: Config):
         """Handle config updates"""
         self.config = new_config
-        if self.current_page == "settings":
-            self.current_page = "all_deals"
+        if self.current_page == self.settings_page.page_id():
+            self.current_page = self.all_deals_page.page_id()
             self.nav_rail.selected_index = 0
             # Refresh the page when returning from settings
             self.refresh_current_page()
@@ -840,6 +827,29 @@ class TBRDealFinderApp:
             self.update_last_run_time()
 
         return self._last_run_time
+
+
+def get_update_notification_container():
+    return ft.Container(
+        content=ft.Text(
+            "Update Available",
+            size=11,
+            color=ft.Colors.ORANGE_400,
+            weight=ft.FontWeight.BOLD,
+            text_align=ft.TextAlign.CENTER
+        ),
+        padding=ft.padding.only(top=8, left=4, right=4, bottom=4),
+        alignment=ft.alignment.center,
+        on_click=lambda e: self.show_update_notification(),
+        border_radius=4,
+        bgcolor=ft.Colors.ORANGE_50,
+        border=ft.border.all(1, ft.Colors.ORANGE_400)
+    )
+
+
+def ddb_cleanup():
+    db_conn = get_duckdb_conn()
+    db_conn.close()
 
 
 def main():
