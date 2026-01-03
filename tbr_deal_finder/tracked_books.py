@@ -359,24 +359,25 @@ def is_tbr_book(book: dict) -> bool:
 def reprocess_incomplete_tbr_books(config: Config):
     db_conn = get_duckdb_conn()
 
+    query_base = "DELETE FROM tbr_book WHERE disable_price_tracking IS NOT TRUE"
     if config.is_tracking_format(BookFormat.EBOOK):
         # Replace any tbr_books missing required attr
         db_conn.execute(
-            "DELETE FROM tbr_book WHERE ebook_asin IS NULL AND format != $book_format",
+            f"{query_base} AND ebook_asin IS NULL AND format != $book_format",
             parameters=dict(book_format=BookFormat.AUDIOBOOK.value)
         )
 
     if LibroFM().name in config.tracked_retailers:
         # Replace any tbr_books missing required attr
         db_conn.execute(
-            "DELETE FROM tbr_book WHERE audiobook_isbn IS NULL AND format != $book_format",
+            f"{query_base} AND audiobook_isbn IS NULL AND format != $book_format",
             parameters=dict(book_format=BookFormat.EBOOK.value)
         )
 
     if _requires_audiobook_list_price(config):
         # Replace any tbr_books missing required attr
         db_conn.execute(
-            "DELETE FROM tbr_book WHERE audiobook_list_price IS NULL AND format != $book_format",
+            f"{query_base} AND audiobook_list_price IS NULL AND format != $book_format",
             parameters=dict(book_format=BookFormat.EBOOK.value)
         )
 
@@ -422,7 +423,11 @@ async def sync_tbr_books(config: Config):
     db_conn.unregister("_df")
 
 
-async def get_tbr_books(config: Config) -> list[Book]:
+async def get_tbr_books(
+    config: Config,
+    exclude_internal: bool,
+    exclude_disabled: bool,
+) -> list[Book]:
     await sync_tbr_books(config)
 
     db_conn = get_duckdb_conn()
@@ -431,4 +436,14 @@ async def get_tbr_books(config: Config) -> list[Book]:
         "SELECT * EXCLUDE(book_id) FROM tbr_book"
     )
 
-    return [Book(retailer="N/A", timepoint=config.run_time, **b) for b in tbr_book_data]
+    return [
+        Book(retailer="N/A", timepoint=config.run_time, **b)
+        for b in tbr_book_data
+        if (
+            not exclude_internal
+            or not b["is_internal"]
+        ) and (
+            not exclude_disabled
+            or not b["disable_price_tracking"]
+        )
+    ]
