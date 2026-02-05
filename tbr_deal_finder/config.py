@@ -66,6 +66,9 @@ class Config:
 
             cls.locale = code
 
+    def set_tracked_retailers(self, retailers: Union[list, str, None]) -> None:
+        self.tracked_retailers = get_normalized_list(retailers)
+
     @classmethod
     def load(cls) -> "Config":
         """Load configuration from file or return defaults."""
