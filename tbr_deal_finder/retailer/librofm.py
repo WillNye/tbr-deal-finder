@@ -14,7 +14,7 @@ from tbr_deal_finder.utils import currency_to_float, echo_err
 
 
 class LibroFM(AioHttpSession, Retailer):
-    BASE_URL = "https://libro.fm"
+    BASE_URL = "https://libro.fm/api/v11/"
     USER_AGENT = "okhttp/3.14.9"
     USER_AGENT_DOWNLOAD = (
         "AndroidDownloadManager/11 (Linux; U; Android 11; "
@@ -42,6 +42,9 @@ class LibroFM(AioHttpSession, Retailer):
         url = urllib.parse.urljoin(self.BASE_URL, url_path)
         headers = kwargs.pop("headers", {})
         headers["User-Agent"] = self.USER_AGENT
+        headers["X-LibroFm-Device"] = "sdk_phone_x86_64"
+        headers["X-LibroFm-OsVer"] = "Android 11"
+        headers["X-LibroFm-AppVer"] = "7.6.1"
         if self.auth_token:
             headers["authorization"] = f"Bearer {self.auth_token}"
 
@@ -125,7 +128,7 @@ class LibroFM(AioHttpSession, Retailer):
 
         async with semaphore:
             response = await self.make_request(
-                f"api/v10/explore/search",
+                "explore/search",
                 "GET",
                 params={
                     "q": title,
@@ -156,7 +159,7 @@ class LibroFM(AioHttpSession, Retailer):
         async with semaphore:
             for _ in range(10):
                 response = await self.make_request(
-                    f"api/v10/explore/audiobook_details/{target.audiobook_isbn}",
+                    f"explore/audiobook_details/{target.audiobook_isbn}",
                     "GET"
                 )
 
@@ -174,7 +177,7 @@ class LibroFM(AioHttpSession, Retailer):
         total_pages = 1
         while page <= total_pages:
             response = await self.make_request(
-                f"api/v10/explore/wishlist",
+                "explore/wishlist",
                 "GET",
                 params=dict(page=page)
             )
@@ -208,7 +211,7 @@ class LibroFM(AioHttpSession, Retailer):
         total_pages = 1
         while page <= total_pages:
             response = await self.make_request(
-                f"api/v10/library",
+                "library",
                 "GET",
                 params=dict(page=page)
             )

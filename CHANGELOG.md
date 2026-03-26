@@ -3,6 +3,13 @@
 
 ---
 
+## 0.3.13 (March 25, 2026)
+
+BUG FIXES:
+* Fixed libro.fm support. Updated the libro.fm API endpoints
+
+---
+
 ## 0.3.12 (January 02, 2026)
 
 Notes:
