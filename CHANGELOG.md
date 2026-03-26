@@ -7,6 +7,7 @@
 
 BUG FIXES:
 * Fixed libro.fm support. Updated the libro.fm API endpoints
+* Fix issue where supported retailers couldn't be set in the CLI
 
 ---
 
