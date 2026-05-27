@@ -126,7 +126,7 @@ class TBRDealFinderApp:
         # Add update indicator if update is available
         if self.update_info:
             bottom_section_widgets.append(
-                get_update_notification_container()
+                self.get_update_notification_container()
             )
         
         # Update the bottom container content
@@ -215,7 +215,7 @@ class TBRDealFinderApp:
         # Add update indicator if update is available
         if self.update_info:
             bottom_section_widgets.append(
-                get_update_notification_container()
+                self.get_update_notification_container()
             )
         
         # Create navigation container with logo at bottom
@@ -828,23 +828,22 @@ class TBRDealFinderApp:
 
         return self._last_run_time
 
-
-def get_update_notification_container():
-    return ft.Container(
-        content=ft.Text(
-            "Update Available",
-            size=11,
-            color=ft.Colors.ORANGE_400,
-            weight=ft.FontWeight.BOLD,
-            text_align=ft.TextAlign.CENTER
-        ),
-        padding=ft.padding.only(top=8, left=4, right=4, bottom=4),
-        alignment=ft.alignment.center,
-        on_click=lambda e: self.show_update_notification(),
-        border_radius=4,
-        bgcolor=ft.Colors.ORANGE_50,
-        border=ft.border.all(1, ft.Colors.ORANGE_400)
-    )
+    def get_update_notification_container(self):
+        return ft.Container(
+            content=ft.Text(
+                "Update Available",
+                size=11,
+                color=ft.Colors.ORANGE_400,
+                weight=ft.FontWeight.BOLD,
+                text_align=ft.TextAlign.CENTER
+            ),
+            padding=ft.padding.only(top=8, left=4, right=4, bottom=4),
+            alignment=ft.alignment.center,
+            on_click=lambda e: self.show_update_notification(),
+            border_radius=4,
+            bgcolor=ft.Colors.ORANGE_50,
+            border=ft.border.all(1, ft.Colors.ORANGE_400)
+        )
 
 
 def ddb_cleanup():

@@ -3,6 +3,15 @@
 
 ---
 
+## 0.3.14 (May 27, 2026)
+
+BUG FIXES:
+* Update available notification is clickable
+* Bump Chirp endpoint to fix authentication issue
+* Resolve crash errors when closing the desktop app
+
+---
+
 ## 0.3.13 (March 25, 2026)
 
 BUG FIXES:

@@ -16,7 +16,7 @@ from tbr_deal_finder.utils import currency_to_float, echo_err
 class Chirp(AioHttpSession, Retailer):
     # Static because url for other locales just redirects to .com
     _url: str = "https://api.chirpbooks.com/api/graphql"
-    USER_AGENT = "ChirpBooks/5.13.9 (Android)"
+    USER_AGENT = "ChirpBooks/5.20.2 (Android)"
 
     def __init__(self):
         super().__init__()
