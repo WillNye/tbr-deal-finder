@@ -114,8 +114,8 @@ class AioHttpSession:
         """Attempt to close session on garbage collection."""
         if self._session and not self._session.closed:
             try:
-                asyncio.create_task(self._session.close())
+                asyncio.create_task(self.close())
             except RuntimeError:
                 # Event loop might be closed
-                pass
+                asyncio.run(self.close())
 
