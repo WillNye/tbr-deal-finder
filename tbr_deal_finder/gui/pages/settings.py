@@ -20,6 +20,7 @@ class SettingsPage:
         self.locale = Config.locale
         self.is_kindle_unlimited_member = False
         self.is_audible_plus_member = True
+        self.is_kobo_plus_member = False
         
         # Create file picker once and add to page overlay
         self.file_picker = ft.FilePicker(on_result=self.on_file_picker_result)
@@ -41,6 +42,7 @@ class SettingsPage:
             self.min_discount = self.config.min_discount
             self.is_kindle_unlimited_member = self.config.is_kindle_unlimited_member
             self.is_audible_plus_member = self.config.is_audible_plus_member
+            self.is_kobo_plus_member = self.config.is_kobo_plus_member
             self.locale = Config.locale
         except FileNotFoundError:
             self.library_paths = []
@@ -126,6 +128,18 @@ class SettingsPage:
             visible=bool("Kindle" in self.tracked_retailers),
         )
         retailer_checkboxes.append(self.kindle_unlimited_checkbox)
+
+        # Kobo Plus membership checkbox (covers both Kobo retailers)
+        self.kobo_plus_checkbox = ft.Container(
+            content=ft.Checkbox(
+                label="Are you an active Kobo Plus member?",
+                value=self.is_kobo_plus_member,
+                on_change=self.update_kobo_plus_membership,
+            ),
+            margin=ft.margin.only(left=30),
+            visible=bool({"Kobo E-Book", "Kobo Audiobook"} & set(self.tracked_retailers)),
+        )
+        retailer_checkboxes.append(self.kobo_plus_checkbox)
 
         retailers_section = ft.Container(
             content=ft.Column([
@@ -309,6 +323,12 @@ class SettingsPage:
         elif retailer == "Audible":
             self.audible_plus_checkbox.visible = is_checked
             self.app.page.update()
+        elif retailer in ("Kobo E-Book", "Kobo Audiobook"):
+            # Either Kobo retailer being tracked shows the shared Kobo Plus toggle.
+            self.kobo_plus_checkbox.visible = bool(
+                {"Kobo E-Book", "Kobo Audiobook"} & set(self.tracked_retailers)
+            )
+            self.app.page.update()
 
 
     def update_max_price(self, e):
@@ -333,6 +353,10 @@ class SettingsPage:
         """Update Audible Plus membership status"""
         self.is_audible_plus_member = e.control.value
 
+    def update_kobo_plus_membership(self, e):
+        """Update Kobo Plus membership status"""
+        self.is_kobo_plus_member = e.control.value
+
     def save_config(self, e):
         """Save the configuration"""
         if not self.tracked_retailers:
@@ -348,6 +372,7 @@ class SettingsPage:
                 self.config.min_discount = self.min_discount
                 self.config.is_kindle_unlimited_member = self.is_kindle_unlimited_member
                 self.config.is_audible_plus_member = self.is_audible_plus_member
+                self.config.is_kobo_plus_member = self.is_kobo_plus_member
                 self.config.set_locale(self.locale)
             else:
                 # Create new config
@@ -357,7 +382,8 @@ class SettingsPage:
                     max_price=self.max_price,
                     min_discount=self.min_discount,
                     is_kindle_unlimited_member=self.is_kindle_unlimited_member,
-                    is_audible_plus_member=self.is_audible_plus_member
+                    is_audible_plus_member=self.is_audible_plus_member,
+                    is_kobo_plus_member=self.is_kobo_plus_member
                 )
                 self.config.set_locale(self.locale)
 
