@@ -171,9 +171,25 @@ async def _apply_proper_current_price_kindle(config: Config, books: list[Book]):
             b.current_price = b.alt_price
 
 
+async def _apply_proper_current_price_kobo(config: Config, books: list[Book]):
+    """For Kobo Plus members, use the member price (LovePrice / free-with-Plus)
+    captured in alt_price when it beats the regular price."""
+    if not config.is_kobo_plus_member:
+        return
+
+    for b in books:
+        if (
+            b.retailer in ("Kobo E-Book", "Kobo Audiobook")
+            and b.alt_price is not None
+            and b.current_price > b.alt_price
+        ):
+            b.current_price = b.alt_price
+
+
 async def _apply_proper_current_price(config: Config, books: list[Book]):
     await _apply_proper_current_price_audible(config, books)
     await _apply_proper_current_price_kindle(config, books)
+    await _apply_proper_current_price_kobo(config, books)
 
 
 def _get_retailer_relevant_tbr_books(

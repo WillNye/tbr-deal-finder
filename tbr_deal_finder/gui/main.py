@@ -1,5 +1,4 @@
 import asyncio
-import atexit
 import os
 import base64
 import subprocess
@@ -30,8 +29,6 @@ from tbr_deal_finder.utils import get_duckdb_conn, get_latest_deal_last_ran
 class TBRDealFinderApp:
     def __init__(self, page: ft.Page):
         # Ensure duckdb connection closes gracefully on app close
-        atexit.register(ddb_cleanup)
-
         self.page = page
         self.config = None
         self.current_page = AllDealsPage.page_id()
@@ -462,16 +459,50 @@ class TBRDealFinderApp:
         message = auth_context.message
         user_copy_context = auth_context.user_copy_context
         pop_up_type = auth_context.pop_up_type
+        auto_poll = auth_context.auto_poll
 
         # Store the dialog reference at instance level temporarily
         self._auth_dialog_result = None
         self._auth_dialog_complete = False
+        self._auth_poll_task = None
 
         def close_dialog():
+            if self._auth_poll_task:
+                self._auth_poll_task.cancel()
+                self._auth_poll_task = None
             dialog.open = False
             self.settings_page.build()
             self.refresh_all_pages()
             self.refresh_current_page()
+
+        def finish_dialog(result: bool):
+            """Close the dialog and report the auth result (used by auto-poll)."""
+            if self._auth_poll_task:
+                self._auth_poll_task.cancel()
+                self._auth_poll_task = None
+            dialog.open = False
+            self._auth_dialog_result = result
+            self._auth_dialog_complete = True
+            self.settings_page.build()
+            self.refresh_all_pages()
+            self.refresh_current_page()
+            self.page.update()
+
+        async def auto_poll_loop():
+            """Poll for a completed browser sign-in on an interval and close the
+            dialog automatically on success. Mirrors the device-pairing poll
+            loop; capped so a never-finished login can't leave a zombie task."""
+            try:
+                for _ in range(120):  # ~10 minutes at a 5s interval
+                    await asyncio.sleep(5)
+                    try:
+                        if await retailer.gui_auth({}):
+                            finish_dialog(True)
+                            return
+                    except Exception:
+                        pass  # transient (e.g. network) — keep polling
+            except asyncio.CancelledError:
+                return
 
         async def handle_submit(e=None):
             form_data = {}
@@ -565,9 +596,24 @@ class TBRDealFinderApp:
                 field["ref"] = field_ref  # Store reference
                 content_controls.append(field_ref)
 
+        if auto_poll:
+            content_controls.append(
+                ft.Row(
+                    [
+                        ft.ProgressRing(width=16, height=16, stroke_width=2),
+                        ft.Text("Awaiting setup completion", size=12),
+                    ],
+                    spacing=10,
+                )
+            )
+
         # Dialog actions
         actions = []
-        if pop_up_type == "form" and fields:
+        if auto_poll:
+            # No submit button — the dialog polls in the background and closes
+            # itself on success. Cancel lets the user back out.
+            actions.append(ft.TextButton("Cancel", on_click=lambda e: finish_dialog(False)))
+        elif pop_up_type == "form":
             actions.extend([
                 ft.ElevatedButton("Login", on_click=handle_submit)
             ])
@@ -595,7 +641,7 @@ class TBRDealFinderApp:
 
                 # Close both dialogs (confirm and auth)
                 close_confirm(_)
-                close_dialog()
+                finish_dialog(False)
 
             confirm_dialog = ft.AlertDialog(
                 title=ft.Text(f"Stop tracking {retailer.name}?"),
@@ -625,8 +671,8 @@ class TBRDealFinderApp:
             title=title_control,
             content=ft.Column(
                 content_controls,
-                width=400,
-                height=None,
+                width=500,
+                height=500,
                 scroll=ft.ScrollMode.AUTO,  # Enable scrolling
                 spacing=10
             ),
@@ -638,6 +684,10 @@ class TBRDealFinderApp:
         self.page.overlay.append(dialog)
         dialog.open = True
         self.page.update()
+
+        # For device-pairing flows, poll in the background and auto-close on success.
+        if auto_poll:
+            self._auth_poll_task = asyncio.create_task(auto_poll_loop())
 
         # Poll for completion
         while not self._auth_dialog_complete:
@@ -844,11 +894,6 @@ class TBRDealFinderApp:
             bgcolor=ft.Colors.ORANGE_50,
             border=ft.border.all(1, ft.Colors.ORANGE_400)
         )
-
-
-def ddb_cleanup():
-    db_conn = get_duckdb_conn()
-    db_conn.close()
 
 
 def main():

@@ -42,7 +42,10 @@ class Config:
     # Both of these are only used if tracking deals on Audible
     is_kindle_unlimited_member: bool = False
     is_audible_plus_member: bool = True
-    
+    # Kobo Plus subscriber: apply Kobo Love (LovePrice) / free-with-Kobo-Plus
+    # pricing when tracking Kobo retailers.
+    is_kobo_plus_member: bool = False
+
     locale: str = "us"  # This will be set as a class attribute below
 
     def __post_init__(self):
@@ -88,7 +91,8 @@ class Config:
             library_export_paths=get_normalized_list(export_paths_str),
             tracked_retailers=get_normalized_list(tracked_retailers_str),
             is_kindle_unlimited_member=parser.getboolean('DEFAULT', 'is_kindle_unlimited_member', fallback=False),
-            is_audible_plus_member=parser.getboolean('DEFAULT', 'is_audible_plus_member', fallback=True)
+            is_audible_plus_member=parser.getboolean('DEFAULT', 'is_audible_plus_member', fallback=True),
+            is_kobo_plus_member=parser.getboolean('DEFAULT', 'is_kobo_plus_member', fallback=False)
         )
 
     @property
@@ -119,7 +123,8 @@ class Config:
             'library_export_paths': self.library_export_paths_str,
             'tracked_retailers': self.tracked_retailers_str,
             'is_kindle_unlimited_member': str(self.is_kindle_unlimited_member),
-            'is_audible_plus_member': str(self.is_audible_plus_member)
+            'is_audible_plus_member': str(self.is_audible_plus_member),
+            'is_kobo_plus_member': str(self.is_kobo_plus_member)
         }
         
         with open(_CONFIG_PATH, 'w') as f:

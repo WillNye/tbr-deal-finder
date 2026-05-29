@@ -18,6 +18,10 @@ class GuiAuthContext:
     message: Optional[str] = None
     user_copy_context: Optional[str] = None
     pop_up_type: Optional[str] = "form"
+    # When True, the GUI polls gui_auth() on an interval and auto-closes the
+    # dialog on success (device-pairing flows like Kobo), instead of waiting
+    # for the user to submit a form.
+    auto_poll: bool = False
 
 
 class Retailer(abc.ABC):
