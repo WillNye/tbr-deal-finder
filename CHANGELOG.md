@@ -3,6 +3,14 @@
 
 ---
 
+## 0.4.1 (May 29, 2026)
+
+Notes:
+* Add retailer support for Kobo E-Books
+* Add retailer support for Kobo Audiobooks
+
+---
+
 ## 0.3.14 (May 27, 2026)
 
 BUG FIXES:

@@ -23,9 +23,11 @@ Track price drops and find deals on books in your TBR (To Be Read) and wishlist 
 * Audible
 * Chirp
 * Libro.fm
+* Kobo
 
 ### EBooks
 * Kindle
+* Kobo
 
 ### Locales
 * US
