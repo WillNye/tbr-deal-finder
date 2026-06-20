@@ -3,6 +3,14 @@
 
 ---
 
+## 0.4.2 (June 20, 2026)
+
+Notes:
+* No longer require bi-weekly login to Libro.fm
+* No longer require bi-weekly login to Chirp
+
+---
+
 ## 0.4.1 (May 29, 2026)
 
 Notes:
