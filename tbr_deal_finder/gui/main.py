@@ -443,8 +443,11 @@ class TBRDealFinderApp:
         for retailer_str in self.config.tracked_retailers:
             retailer = RETAILER_MAP[retailer_str]()
 
-            # Skip if already authenticated
-            if retailer.user_is_authed():
+            # Skip only if a stored token exists AND still authenticates
+            # server-side. The live token_is_valid() check means an expired or
+            # revoked token surfaces the login dialog now, instead of silently
+            # returning no deals this run.
+            if retailer.user_is_authed() and await retailer.token_is_valid():
                 continue
 
             # Use GUI auth instead of CLI auth

@@ -2,7 +2,6 @@ import asyncio
 import json
 import os
 import urllib.parse
-from datetime import datetime, timedelta
 from typing import Union
 
 import click
@@ -57,23 +56,42 @@ class LibroFM(AioHttpSession, Retailer):
         )
         if response.ok:
             return await response.json()
-        else:
-            return {}
+
+        # Libro tokens don't carry an expires_in and there's no refresh flow, so
+        # we reuse the stored token indefinitely and only re-auth when the server
+        # actually rejects it. A 401 on an authed request means the token is dead;
+        # drop it so the next set_auth()/user_is_authed() forces a fresh login.
+        if response.status == 401 and self.auth_token:
+            self.auth_token = None
+            if os.path.exists(self.auth_path):
+                os.remove(self.auth_path)
+
+        return {}
 
     def user_is_authed(self) -> bool:
+        # Validate-on-use: any persisted access_token is considered usable. There
+        # is no client-side expiry because the server gives us no expires_in, and
+        # a stale token is detected at request time (make_request clears it on 401).
         if os.path.exists(self.auth_path):
             with open(self.auth_path, "r") as f:
                 auth_info = json.load(f)
-                token_created_at = datetime.fromtimestamp(auth_info["created_at"])
-                max_token_age = datetime.now() - timedelta(days=14)
-                if token_created_at > max_token_age:
+                if auth_info.get("access_token"):
                     self.auth_token = auth_info["access_token"]
                     return True
 
         return False
 
+    async def token_is_valid(self) -> bool:
+        """Cheaply confirm the persisted token still authenticates server-side.
+
+        A 401 inside make_request clears self.auth_token, so a still-set token
+        after a real authed call means the token is valid.
+        """
+        await self.make_request("library", "GET", params=dict(page=1))
+        return self.auth_token is not None
+
     async def set_auth(self):
-        if self.user_is_authed():
+        if self.user_is_authed() and await self.token_is_valid():
             return
 
         response = await self.make_request(

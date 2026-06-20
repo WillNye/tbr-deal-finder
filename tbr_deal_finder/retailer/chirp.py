@@ -1,9 +1,11 @@
 import asyncio
+import base64
+import binascii
 import json
 import os
-from datetime import datetime, timedelta
+from datetime import datetime
 from textwrap import dedent
-from typing import Union
+from typing import Optional, Union
 
 import click
 
@@ -31,6 +33,10 @@ class Chirp(AioHttpSession, Retailer):
     def format(self) -> BookFormat:
         return BookFormat.AUDIOBOOK
 
+    # GraphQL auth-failure codes Chirp returns. Note these come back with an
+    # HTTP 200 status inside an ``errors`` array, not as an HTTP error.
+    _AUTH_ERROR_CODES = {"token_invalid", "unauthorized"}
+
     async def make_request(self, request_type: str, **kwargs) -> dict:
         headers = kwargs.pop("headers", {})
         headers["Accept"] = "application/json"
@@ -51,42 +57,119 @@ class Chirp(AioHttpSession, Retailer):
         else:
             return {}
 
-    def user_is_authed(self) -> bool:
-        if os.path.exists(self.auth_path):
-            with open(self.auth_path, "r") as f:
-                auth_info = json.load(f)
-                if auth_info:
-                    token_created_at = datetime.fromtimestamp(auth_info["created_at"])
-                    max_token_age = datetime.now() - timedelta(days=14)
-                    if token_created_at > max_token_age:
-                        self.auth_token = auth_info["data"]["signIn"]["user"]["token"]
-                        return True
+    @staticmethod
+    def _is_auth_error(response: dict) -> bool:
+        """Detect a Chirp authentication failure.
+
+        Chirp returns HTTP 200 with an ``errors`` array (e.g.
+        ``{"errors": [{"code": "token_invalid"}]}``) when the bearer token is
+        missing, invalid, or expired, so a plain ``response.ok`` check is not
+        enough.
+        """
+        if not response:
+            return False
+        for error in response.get("errors", []) or []:
+            if error.get("code") in Chirp._AUTH_ERROR_CODES:
+                return True
         return False
 
-    async def set_auth(self):
-        if self.user_is_authed():
-            return
+    @staticmethod
+    def _token_is_expired(token: str) -> bool:
+        """Return True only if the JWT carries an ``exp`` claim that has passed.
 
+        Chirp tokens are JWTs valid for ~1 year. We trust the embedded ``exp``
+        rather than a self-imposed window. If the token can't be parsed we
+        assume it's still good and let validate-on-use catch a bad token.
+        """
+        try:
+            payload_b64 = token.split(".")[1]
+            payload_b64 += "=" * (-len(payload_b64) % 4)
+            payload = json.loads(base64.urlsafe_b64decode(payload_b64))
+        except (IndexError, ValueError, binascii.Error):
+            return False
+
+        exp = payload.get("exp")
+        if not exp:
+            return False
+        return datetime.now().timestamp() >= exp
+
+    def _load_stored_token(self) -> Optional[str]:
+        """Return the stored token if present, regardless of age."""
+        if not os.path.exists(self.auth_path):
+            return None
+        with open(self.auth_path, "r") as f:
+            auth_info = json.load(f)
+        if not auth_info:
+            return None
+        try:
+            return auth_info["data"]["signIn"]["user"]["token"]
+        except (KeyError, TypeError):
+            return None
+
+    def user_is_authed(self) -> bool:
+        token = self._load_stored_token()
+        if not token:
+            return False
+        if self._token_is_expired(token):
+            return False
+        # Reuse the stored token indefinitely until it actually expires. If the
+        # server has invalidated it early, the next real request surfaces an
+        # auth error and triggers a fresh sign-in (see set_auth).
+        self.auth_token = token
+        return True
+
+    async def token_is_valid(self) -> bool:
+        """Confirm the current token still authenticates a real API call."""
+        response = await self.make_request(
+            "POST",
+            json={
+                "query": "query AndroidCurrentUserAudiobooks($page: Int!, $pageSize: Int!) { currentUserAudiobooks(page: $page, pageSize: $pageSize, sort: TITLE_A_Z, clientCapabilities: [CHIRP_AUDIO]) { audiobook { id } } }",
+                "variables": {"page": 1, "pageSize": 1},
+                "operationName": "AndroidCurrentUserAudiobooks",
+            }
+        )
+        return not self._is_auth_error(response)
+
+    async def _sign_in(self, email: str, password: str) -> bool:
         response = await self.make_request(
             "POST",
             json={
                 "query": "mutation signIn($email: String!, $password: String!) { signIn(email: $email, password: $password) { user { id token webToken email } } }",
                 "variables": {
-                    "email": click.prompt("Chirp account email"),
-                    "password": click.prompt("Chirp Password", hide_input=True),
+                    "email": email,
+                    "password": password,
                 }
             }
         )
-        if not response:
-            echo_err("Chirp login failed, please try again.")
-            await self.set_auth()
+
+        token = response.get("data", {}).get("signIn", {}).get("user", {}).get("token") if response else None
+        if not token:
+            return False
 
         # Set token for future requests during the current execution
-        self.auth_token = response["data"]["signIn"]["user"]["token"]
+        self.auth_token = token
 
         response["created_at"] = datetime.now().timestamp()
         with open(self.auth_path, "w") as f:
             json.dump(response, f)
+        return True
+
+    async def set_auth(self):
+        # Reuse the persisted token unless it has expired or been revoked.
+        if self.user_is_authed() and await self.token_is_valid():
+            return
+
+        # Stored token is gone, expired, or rejected by the server: drop it and
+        # prompt for a fresh sign-in.
+        self.auth_token = None
+        if await self._sign_in(
+            click.prompt("Chirp account email"),
+            click.prompt("Chirp Password", hide_input=True),
+        ):
+            return
+
+        echo_err("Chirp login failed, please try again.")
+        await self.set_auth()
 
     @property
     def gui_auth_context(self) -> GuiAuthContext:
@@ -99,35 +182,7 @@ class Chirp(AioHttpSession, Retailer):
         )
 
     async def gui_auth(self, form_data: dict) -> bool:
-        response = await self.make_request(
-            "POST",
-            json={
-                "query": "mutation signIn($email: String!, $password: String!) { signIn(email: $email, password: $password) { user { id token webToken email } } }",
-                "variables": {
-                    "email": form_data["email"],
-                    "password": form_data["password"],
-                }
-            }
-        )
-        if not response:
-            return False
-
-        auth_token = response.get("data", {})
-        for key in ["signIn", "user", "token"]:
-            if key not in auth_token:
-                return False
-            auth_token = auth_token[key]
-
-            if not auth_token:
-                return False
-
-        # Set token for future requests during the current execution
-        self.auth_token = auth_token
-
-        response["created_at"] = datetime.now().timestamp()
-        with open(self.auth_path, "w") as f:
-            json.dump(response, f)
-        return True
+        return await self._sign_in(form_data["email"], form_data["password"])
 
     async def get_book(
         self, config: Config, target: Book, semaphore: asyncio.Semaphore

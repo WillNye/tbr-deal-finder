@@ -60,6 +60,19 @@ class Retailer(abc.ABC):
     async def set_auth(self):
         raise NotImplementedError
 
+    async def token_is_valid(self) -> bool:
+        """Live-validate the currently loaded session token.
+
+        ``user_is_authed()`` only confirms a token is present (and, where the
+        token carries an expiry, not yet expired). It cannot catch a token that
+        the server has revoked early. Retailers whose tokens can die or be
+        revoked server-side override this with one cheap authed request so both
+        the CLI and GUI can re-prompt instead of silently returning no data.
+
+        The default trusts ``user_is_authed()``.
+        """
+        return True
+
     async def gui_auth(self, form_data: dict) -> bool:
         raise NotImplementedError
 
