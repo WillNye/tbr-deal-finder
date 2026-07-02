@@ -5,13 +5,14 @@ import flet as ft
 from tbr_deal_finder.book import Book, BookFormat
 from tbr_deal_finder.tracked_books import get_tbr_books
 from tbr_deal_finder.gui.pages.base_book_page import BaseBookPage
+from tbr_deal_finder.gui.widgets import book_tile_card, cover_image_for_format, truncate_title
 
 logger = logging.getLogger(__name__)
 
 
 class WishlistPage(BaseBookPage):
     def __init__(self, app):
-        super().__init__(app, items_per_page=7)
+        super().__init__(app, items_per_page=9)
 
     @staticmethod
     def page_id():
@@ -82,29 +83,19 @@ class WishlistPage(BaseBookPage):
 
     def create_item_tile(self, book: Book):
         """Create a tile for a single book"""
-        # Truncate title if too long
-        title = book.title
-        if len(title) > 60:
-            title = f"{title[:60]}..."
-
-        return ft.Card(
-            content=ft.Container(
-                content=ft.ListTile(
-                    title=ft.Text(title, weight=ft.FontWeight.BOLD),
-                    subtitle=ft.Column([
-                        ft.Text(f"by {book.authors}", color=ft.Colors.GREY_600),
-                    ], spacing=2),
-                    trailing=ft.IconButton(
-                        icon=ft.Icons.VISIBILITY if not book.disable_price_tracking else ft.Icons.VISIBILITY_OFF,
-                        tooltip="Toggle price tracking",
-                        on_click=lambda e, b=book: self.show_price_tracking_dialog(b),
-                        icon_size=20
-                    ),
-                    on_click=lambda e, b=book: self.app.show_book_details(b, b.format)
-                ),
-                padding=10,
-                on_click=lambda e, b=book: self.app.show_book_details(b, b.format)
-            )
+        return book_tile_card(
+            cover_image_for_format(book.image_url, book.format),
+            [
+                ft.Text(truncate_title(book.title), weight=ft.FontWeight.BOLD),
+                ft.Text(f"by {book.authors}", color=ft.Colors.GREY_600),
+            ],
+            overlay=ft.IconButton(
+                icon=ft.Icons.VISIBILITY if not book.disable_price_tracking else ft.Icons.VISIBILITY_OFF,
+                tooltip="Toggle price tracking",
+                on_click=lambda e, b=book: self.show_price_tracking_dialog(b),
+                icon_size=20
+            ),
+            on_click=lambda e, b=book: self.app.show_book_details(b, b.format),
         )
 
     def check_book_has_deals(self, book: Book) -> bool:

@@ -155,14 +155,19 @@ class BaseBookPage(ABC):
         start_idx = self.current_page * self.items_per_page
         end_idx = min(start_idx + self.items_per_page, len(self.filtered_items))
         page_items = self.filtered_items[start_idx:end_idx]
-        
+
+        cols = self._grid_columns()
+        self._last_grid_columns = cols
+        span = 12 // cols  # ResponsiveRow uses a 12-column grid
+
         item_tiles = []
         for item in page_items:
             tile = self.create_item_tile(item)
+            tile.col = span
             item_tiles.append(tile)
-        
+
         return ft.Container(
-            content=ft.Column(item_tiles, spacing=5),
+            content=ft.ResponsiveRow(item_tiles, columns=12, spacing=10, run_spacing=10),
             border=ft.border.all(1, ft.Colors.OUTLINE),
             border_radius=8,
             padding=10
@@ -291,6 +296,27 @@ class BaseBookPage(ABC):
             self.pagination_container.content = self.build_pagination()
             if self.app and hasattr(self.app, 'page'):
                 self.app.page.update()
+
+    _WINDOW_COLUMN_BREAKPOINTS = [(1450, 3), (950, 2)]  # below last -> 1
+
+    def _grid_columns(self) -> int:
+        """How many tiles to show per row based on the current window width."""
+        page = getattr(self.app, "page", None)
+        width = getattr(page, "width", None) if page else None
+        if not width:
+            return 3  # sensible default before the window has reported its size
+        for min_width, cols in self._WINDOW_COLUMN_BREAKPOINTS:
+            if width >= min_width:
+                return cols
+        return 1
+
+    def handle_resize(self, e=None):
+        """Reflow the grid, but only when the column count actually changes.
+
+        Invoked by the app's global resize dispatcher for the visible page.
+        """
+        if self._grid_columns() != getattr(self, "_last_grid_columns", None):
+            self.update_items_display()
 
     def set_loading(self, loading: bool):
         """Set loading state and update UI"""

@@ -7,7 +7,7 @@ logger = logging.getLogger(__name__)
 
 class AllDealsPage(BaseDealsPage):
     def __init__(self, app):
-        super().__init__(app, items_per_page=6)
+        super().__init__(app, items_per_page=9)
 
     @staticmethod
     def page_id():

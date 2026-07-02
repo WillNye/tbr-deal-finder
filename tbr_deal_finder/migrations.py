@@ -109,6 +109,20 @@ _MIGRATIONS = [
             ALTER TABLE tbr_book ADD COLUMN disable_price_tracking BOOLEAN DEFAULT FALSE;
             """
     ),
+    TableMigration(
+        version=4,
+        table_name="tbr_book",
+        sql="""
+            ALTER TABLE tbr_book ADD COLUMN image_url VARCHAR;
+            """
+    ),
+    TableMigration(
+        version=5,
+        table_name="retailer_deal",
+        sql="""
+            ALTER TABLE retailer_deal ADD COLUMN is_heartbeat BOOLEAN DEFAULT FALSE;
+            """
+    ),
 ]
 
 

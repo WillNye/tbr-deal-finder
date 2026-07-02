@@ -37,6 +37,8 @@ class Book:
         exists: bool = True,
         is_internal: bool = False,
         disable_price_tracking: bool = False,
+        image_url: str = None,
+        is_heartbeat: bool = False,
     ):
         self.retailer = retailer
         self.title = get_normalized_title(title)
@@ -59,6 +61,13 @@ class Book:
         # Example: I have The Lies of Locke Lamora in my TBR
         #   However, I can get it at the library, so I don't want to see deals on it.
         self.disable_price_tracking = disable_price_tracking
+
+        # Cover image URL.
+        # Filled once on tbr_book and never overwritten.
+        self.image_url = image_url
+
+        # For to keep price history dense while the price holds steady
+        self.is_heartbeat = is_heartbeat
 
         self.list_price = list_price
         self.current_price = current_price
@@ -138,6 +147,7 @@ class Book:
             "deleted": self.deleted,
             "deal_id": self.deal_id,
             "is_internal": self.is_internal,
+            "is_heartbeat": self.is_heartbeat,
         }
 
     def tbr_dict(self):
@@ -151,6 +161,7 @@ class Book:
             "book_id": self.title_id,
             "is_internal": self.is_internal,
             "disable_price_tracking": self.disable_price_tracking,
+            "image_url": self.image_url,
         }
 
     def unknown_book_dict(self):

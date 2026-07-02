@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from typing import List
 
 from tbr_deal_finder.book import Book, BookFormat
+from tbr_deal_finder.gui.widgets import cover_image_for_format, truncate_title
 from tbr_deal_finder.utils import get_duckdb_conn, execute_query, float_to_currency
 
 logger = logging.getLogger(__name__)
@@ -26,7 +27,10 @@ def build_book_price_section(max_dt: datetime, historical_data: list[dict]) -> f
 
     min_price = None
     max_price = None
-    min_time = None
+    window_start = (max_dt - timedelta(days=90)).replace(
+        day=1, hour=0, minute=0, second=0, microsecond=0
+    )
+    min_time = window_start.timestamp()
     max_time = max_dt.timestamp()
 
     for record in historical_data:
@@ -57,14 +61,22 @@ def build_book_price_section(max_dt: datetime, historical_data: list[dict]) -> f
         )
 
         # Track price range
-        if not min_price or record["current_price"] < min_price:
+        if min_price is None or record["current_price"] < min_price:
             min_price = record["current_price"]
-        if not max_price or record["list_price"] > max_price:
+        if max_price is None or record["list_price"] > max_price:
             max_price = record["list_price"]
 
-        # Track time range
-        if not min_time or timestamp < min_time:
-            min_time = timestamp
+    for retailer, data in retailer_data.items():
+        data["backfill"] = None
+        points = data["data"]
+        if not points or points[0].x <= min_time:
+            continue
+        first_point = points[0]
+        pad_tooltip = f"{retailer}: {float_to_currency(first_point.y)} (before tracking)"
+        data["backfill"] = [
+            ft.LineChartDataPoint(min_time, first_point.y, tooltip=pad_tooltip),
+            ft.LineChartDataPoint(first_point.x, first_point.y, tooltip=pad_tooltip),
+        ]
 
     # Add hover padding to current date
     for retailer, data in retailer_data.items():
@@ -107,41 +119,47 @@ def build_book_price_section(max_dt: datetime, historical_data: list[dict]) -> f
             )
         )
 
-    # X-axis setup - create labels for actual data points
+    # X-axis setup - one label per month across the whole window, so the axis reflects the full ~90 days.
     x_axis_labels = []
-
-    # Get unique months from the data
-    unique_months = set()
-    for record in historical_data:
-        timepoint = record["timepoint"].replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-        month_year = timepoint.strftime('%B %Y')
-        unique_months.add((timepoint.timestamp(), month_year))
-
-    # Sort by timestamp and create labels
-    for timestamp, month_year in sorted(unique_months):
-        date_str = month_year.split()[0]  # Just show month abbreviation
+    month_cursor = window_start
+    while month_cursor <= max_dt:
         x_axis_labels.append(
             ft.ChartAxisLabel(
-                value=timestamp,
-                label=ft.Container(
-                    content=ft.Text(date_str),
-                    padding=ft.padding.only(left=20)  # Add top padding
+                value=month_cursor.timestamp(),
+                label=ft.Text(month_cursor.strftime('%B'))
+            )
+        )
+        if month_cursor.month == 12:
+            month_cursor = month_cursor.replace(year=month_cursor.year + 1, month=1)
+        else:
+            month_cursor = month_cursor.replace(month=month_cursor.month + 1)
+
+    data_series = []
+    for retailer in retailer_data.values():
+        if retailer["backfill"]:
+            data_series.append(
+                ft.LineChartData(
+                    data_points=retailer["backfill"],
+                    stroke_width=3,
+                    color=ft.Colors.with_opacity(0.4, retailer["color"]),
+                    curved=False,
+                    stroke_cap_round=True,
+                    dash_pattern=[4, 4],
                 )
+            )
+        data_series.append(
+            ft.LineChartData(
+                data_points=retailer["data"],
+                stroke_width=3,
+                color=retailer["color"],
+                curved=False,
+                stroke_cap_round=True,
             )
         )
 
     # Create the chart
     chart = ft.LineChart(
-        data_series=[
-            ft.LineChartData(
-                data_points=retailer["data"],
-                stroke_width=3,
-                color=retailer["color"],
-                curved=True,
-                stroke_cap_round=True,
-            )
-            for retailer in retailer_data.values()
-        ],
+        data_series=data_series,
         border=ft.border.all(1, ft.Colors.with_opacity(0.2, ft.Colors.ON_SURFACE)),
         horizontal_grid_lines=ft.ChartGridLines(
             interval=5,
@@ -156,8 +174,7 @@ def build_book_price_section(max_dt: datetime, historical_data: list[dict]) -> f
         left_axis=ft.ChartAxis(labels=y_axis_labels, labels_size=50),
         bottom_axis=ft.ChartAxis(labels=x_axis_labels, labels_interval=3600),  # 1 hour
         expand=False,
-        height=200,
-        width=850,
+        height=250,
         min_x=min_time,
         max_x=max_time,
         min_y=y_min,
@@ -178,16 +195,14 @@ def build_book_price_section(max_dt: datetime, historical_data: list[dict]) -> f
 
     return ft.Column(
         [
-            ft.Container(
-                content=chart,
-                padding=25,
-            ),
+            chart,
             ft.Container(
                 content=legend,
                 alignment=ft.alignment.center,
             ),
         ],
-        spacing=0
+        spacing=15,
+        horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
     )
 
 
@@ -215,29 +230,13 @@ class BookDetailsPage:
             self.selected_format = self.get_default_format()
         
         self.load_book_data()
-        
-        # Header with back button and book info
         header = self.build_header()
-        
-        # Format selector (always show prominently)
-        format_selector = self.build_format_selector()
-        
-        # Current pricing section
-        current_pricing = self.build_current_pricing()
-        
+
         # Historical pricing chart
         historical_chart = self.build_historical_chart()
-        
-        # Book details section
-        book_info = self.build_book_info()
-        
+
         return ft.Column([
             header,
-            format_selector,
-            ft.Divider(),
-            book_info,
-            ft.Divider(),
-            current_pricing,
             ft.Divider(),
             historical_chart,
         ], spacing=20, scroll=ft.ScrollMode.AUTO)
@@ -245,10 +244,8 @@ class BookDetailsPage:
     def build_header(self):
         """Build the header with back button and book title"""
         
-        title = self.book.title
-        if len(title) > 80:
-            title = f"{title[:80]}..."
-        
+        title = truncate_title(self.book.title, 80)
+
         # Create smaller back button
         back_button = ft.IconButton(
             icon=ft.Icons.ARROW_BACK,
@@ -273,21 +270,79 @@ class BookDetailsPage:
             )
         )
         
+        cover = cover_image_for_format(self.book.image_url, self.selected_format, height=300)
+        details = ft.Column([
+            ft.Row([
+                ft.Text(title, size=24, weight=ft.FontWeight.BOLD, selectable=True, expand=True),
+                ft.Container(
+                    content=copy_button,
+                    padding=ft.padding.only(left=5)
+                )
+            ], spacing=0, alignment=ft.MainAxisAlignment.START,
+                vertical_alignment=ft.CrossAxisAlignment.START),
+            ft.Text(f"by {self.book.authors}", size=16, color=ft.Colors.GREY_600),
+            self.build_format_selector(),
+            self.build_price_summary_block(),
+        ], spacing=5)
+        current_pricing = self.build_current_pricing()
+
+        stacked = self._is_stacked()
+        self._last_stacked = stacked
+
+        if stacked:
+            body = ft.Column([
+                ft.Row([cover]),
+                details,
+                current_pricing,
+            ], spacing=20, horizontal_alignment=ft.CrossAxisAlignment.STRETCH)
+        else:
+            details.expand = True
+            left_unit = ft.Row(
+                [cover, details],
+                spacing=30,
+                vertical_alignment=ft.CrossAxisAlignment.START,
+                expand=2,
+            )
+            current_pricing.expand = 3
+            body = ft.Row(
+                [left_unit, current_pricing],
+                spacing=30,
+                vertical_alignment=ft.CrossAxisAlignment.START,
+            )
+
         return ft.Column([
             ft.Row([
                 back_button
             ], alignment=ft.MainAxisAlignment.START),
-            ft.Column([
-                ft.Row([
-                    ft.Text(title, size=24, weight=ft.FontWeight.BOLD, selectable=True),
-                    ft.Container(
-                        content=copy_button,
-                        padding=ft.padding.only(left=5)
-                    )
-                ], spacing=0, alignment=ft.MainAxisAlignment.START),
-                ft.Text(f"by {self.book.authors}", size=16, color=ft.Colors.GREY_600)
-            ], spacing=5, expand=True)
+            body,
         ], spacing=10)
+
+    # Window width (px) below which the header stacks vertically.
+    STACK_BELOW_WIDTH = 1750
+
+    def _is_stacked(self) -> bool:
+        page = getattr(self.app, "page", None)
+        width = getattr(page, "width", None) if page else None
+        return bool(width) and width < self.STACK_BELOW_WIDTH
+
+    def handle_resize(self, e=None):
+        """Rebuild the page only when crossing the stack threshold.
+
+        Invoked by the app's global resize dispatcher for the visible page.
+        """
+        if self._is_stacked() != getattr(self, "_last_stacked", None):
+            self.app.update_content()
+
+    def build_price_summary_block(self):
+        """Price summary heading with its stat rows indented beneath it, shown in the
+        details column under the format."""
+        return ft.Column([
+            ft.Text("Price Summary", size=18, weight=ft.FontWeight.BOLD),
+            ft.Container(
+                content=ft.Column(self._price_summary_rows(), spacing=8),
+                padding=ft.padding.only(left=15),
+            ),
+        ], spacing=8)
 
     def get_default_format(self) -> BookFormat:
         """Get the default format for this book, preferring audiobook"""
@@ -347,7 +402,7 @@ class BookDetailsPage:
             # Only one format available, just show the text
             return ft.Container(
                 content=format_text,
-                padding=ft.padding.symmetric(0, 10)
+                padding=ft.padding.only(top=5)
             )
         
         # Multiple formats available, show text + dropdown
@@ -374,7 +429,7 @@ class BookDetailsPage:
                 format_text,
                 format_dropdown
             ], spacing=20, alignment=ft.MainAxisAlignment.START),
-            padding=ft.padding.symmetric(10, 10)
+            padding=ft.padding.only(top=5)
         )
 
     def create_format_badge(self, format_type: BookFormat):
@@ -414,29 +469,23 @@ class BookDetailsPage:
         self.selected_format = format_type
 
     def build_current_pricing(self):
-        """Build current pricing information section"""
+        """Build the Current Pricing section"""
         if not self.current_deals:
-            return ft.Container(
-                content=ft.Column([
-                    ft.Text("Current Pricing", size=20, weight=ft.FontWeight.BOLD),
-                    ft.Text("No current deals available for this book", color=ft.Colors.GREY_600)
-                ]),
-                padding=20,
-                border=ft.border.all(1, ft.Colors.OUTLINE),
-                border_radius=8
+            body = ft.Text("No current deals available for this book", color=ft.Colors.GREY_600)
+        else:
+            cards = [self.create_retailer_card(deal) for deal in self.current_deals]
+            body = ft.Row(
+                cards,
+                wrap=True,
+                spacing=10,
+                run_spacing=10,
+                alignment=ft.MainAxisAlignment.SPACE_EVENLY,
             )
-        
-        # Group deals by retailer
-        retailer_cards = []
-        for deal in self.current_deals:
-            card = self.create_retailer_card(deal)
-            retailer_cards.append(card)
-        
+
         return ft.Container(
             content=ft.Column([
                 ft.Text("Current Pricing", size=20, weight=ft.FontWeight.BOLD),
-                ft.Text(f"Showing prices for {len(retailer_cards)} retailer(s)", color=ft.Colors.GREY_600),
-                ft.Row(retailer_cards, wrap=True, spacing=10)
+                body,
             ], spacing=15),
             padding=20,
             border=ft.border.all(1, ft.Colors.OUTLINE),
@@ -498,70 +547,49 @@ class BookDetailsPage:
         
         # Create the chart
         chart_fig = build_book_price_section(self.app.get_last_run_time(), self.historical_data)
-        
+
         return ft.Container(
             content=ft.Column([
                 ft.Text("Historical Pricing", size=20, weight=ft.FontWeight.BOLD),
                 ft.Text("Price trends over the last 3 months", color=ft.Colors.GREY_600),
                 ft.Container(
                     content=chart_fig,
-                    height=300,
-                    alignment=ft.alignment.center
-                )
-                # Note: Flet has limited Plotly integration. In a real implementation,
-                # you might use ft.PlotlyChart or save as image and display
-            ], spacing=15),
+                    padding=ft.padding.symmetric(horizontal=60),
+                ),
+            ], spacing=15, horizontal_alignment=ft.CrossAxisAlignment.STRETCH),
             padding=20,
             border=ft.border.all(1, ft.Colors.OUTLINE),
             border_radius=8
         )
 
-    def build_book_info(self):
-        """Build book information section"""
-        info_items = []
-        
-        # Basic info
-        info_items.extend([
-            self.create_info_row("Title", self.book.title),
-            self.create_info_row("Author(s)", self.book.authors),
-            self.create_info_row("Format", self.selected_format.value)
-        ])
-        
-        # Price statistics from current deals
-        if self.current_deals:
-            prices = [deal.current_price for deal in self.current_deals]
-            discounts = [deal.discount() for deal in self.current_deals]
+    def _price_summary_rows(self):
+        """Agg pricing stat rows shown alongside the retailer price tiles."""
+        if not self.current_deals:
+            return [ft.Text("No pricing data available", color=ft.Colors.GREY_600)]
 
+        prices = [deal.current_price for deal in self.current_deals]
+        discounts = [deal.discount() for deal in self.current_deals]
+        rows = []
 
-            if len(prices) > 1:
-                info_items.append(self.create_info_row("Lowest Price", f"${min(prices):.2f}"))
-            else:
-                info_items.append(self.create_info_row("Current Price", f"${min(prices):.2f}"))
+        if len(prices) > 1:
+            rows.append(self.create_info_row("Lowest Price", float_to_currency(min(prices))))
+        else:
+            rows.append(self.create_info_row("Current Price", float_to_currency(min(prices))))
 
-            if self.has_historical_data():
-                historical_prices = [retailer["current_price"] for retailer in self.historical_data]
-                lowest_ever_price = min(historical_prices)
-                info_items.append(self.create_info_row("Lowest Ever", f"${lowest_ever_price:.2f}"))
+        if self.has_historical_data():
+            historical_prices = [retailer["current_price"] for retailer in self.historical_data]
+            rows.append(self.create_info_row("Lowest Ever", float_to_currency(min(historical_prices))))
 
-            if len(prices) > 1:
-                info_items.extend([
-                    self.create_info_row("Highest Price", f"${max(prices):.2f}"),
-                    self.create_info_row("Best Discount", f"{max(discounts)}%"),
-                ])
+        if len(prices) > 1:
+            rows.extend([
+                self.create_info_row("Highest Price", float_to_currency(max(prices))),
+                self.create_info_row("Best Discount", f"{max(discounts)}%"),
+            ])
 
-            info_items.append(
-                self.create_info_row("Available At", f"{len(self.current_deals)} retailer(s)")
-            )
-        
-        return ft.Container(
-            content=ft.Column([
-                ft.Text("Book Information", size=20, weight=ft.FontWeight.BOLD),
-                ft.Column(info_items, spacing=8)
-            ], spacing=15),
-            padding=20,
-            border=ft.border.all(1, ft.Colors.OUTLINE),
-            border_radius=8
+        rows.append(
+            self.create_info_row("Available At", f"{len(self.current_deals)} retailer(s)")
         )
+        return rows
 
     def create_info_row(self, label: str, value: str):
         """Create an information row"""

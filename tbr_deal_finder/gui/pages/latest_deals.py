@@ -3,11 +3,12 @@ from datetime import datetime, timedelta
 
 from tbr_deal_finder.book import get_deals_found_at, Book, is_qualifying_deal
 from tbr_deal_finder.gui.pages.base_deals_page import BaseDealsPage
+from tbr_deal_finder.gui.widgets import book_tile_card, cover_image_for_format, truncate_title
 
 
 class LatestDealsPage(BaseDealsPage):
     def __init__(self, app):
-        super().__init__(app, 4)
+        super().__init__(app, 9)
 
     @staticmethod
     def page_id():
@@ -154,37 +155,23 @@ class LatestDealsPage(BaseDealsPage):
 
     def create_item_tile(self, deal: Book):
         """Create a tile for a single deal"""
-        # Truncate title if too long
-        title = deal.title
-        if len(title) > 50:
-            title = f"{title[:50]}..."
-        
-        # Format price and discount
         price_text = f"{deal.current_price_string()} ({deal.discount()}% off)"
-        
-        return ft.Card(
-            content=ft.Container(
-                content=ft.ListTile(
-                    title=ft.Text(title, weight=ft.FontWeight.BOLD),
-                    subtitle=ft.Column([
-                        ft.Text(f"by {deal.authors}", color=ft.Colors.GREY_600),
-                        ft.Text(price_text, color=ft.Colors.GREEN, weight=ft.FontWeight.BOLD)
-                    ], spacing=2),
-                    trailing=ft.Row([
-                        ft.IconButton(
-                            icon=ft.Icons.VISIBILITY,
-                            tooltip="Toggle price tracking",
-                            on_click=lambda e, book=deal: self.show_price_tracking_dialog(book),
-                            icon_size=20
-                        ),
-                        ft.Column([
-                            ft.Text(deal.retailer, weight=ft.FontWeight.BOLD, size=12)
-                        ], alignment=ft.MainAxisAlignment.CENTER)
-                    ], spacing=5, tight=True),
-                    on_click=lambda e, book=deal: self.app.show_book_details(book, format_type=book.format)
-                ),
-                padding=5
-            )
+
+        return book_tile_card(
+            cover_image_for_format(deal.image_url, deal.format),
+            [
+                ft.Text(deal.retailer, weight=ft.FontWeight.BOLD, size=12, color=ft.Colors.BLUE_400),
+                ft.Text(truncate_title(deal.title, 50), weight=ft.FontWeight.BOLD),
+                ft.Text(f"by {deal.authors}", color=ft.Colors.GREY_600),
+                ft.Text(price_text, color=ft.Colors.GREEN, weight=ft.FontWeight.BOLD),
+            ],
+            overlay=ft.IconButton(
+                icon=ft.Icons.VISIBILITY,
+                tooltip="Toggle price tracking",
+                on_click=lambda e, book=deal: self.show_price_tracking_dialog(book),
+                icon_size=20
+            ),
+            on_click=lambda e, book=deal: self.app.show_book_details(book, format_type=book.format),
         )
 
     def can_run_latest_deals(self) -> bool:

@@ -1,16 +1,28 @@
 import asyncio
 import copy
 from collections import defaultdict
+from datetime import timedelta
 
 import pandas as pd
 
 from tbr_deal_finder.book import Book, get_active_deals, BookFormat
 from tbr_deal_finder.config import Config
 from tbr_deal_finder.owned_books import get_owned_books
-from tbr_deal_finder.tracked_books import get_tbr_books, get_unknown_books, set_unknown_books
+from tbr_deal_finder.tracked_books import (
+    get_tbr_books,
+    get_unknown_books,
+    set_unknown_books,
+    set_tbr_book_covers,
+)
 from tbr_deal_finder.retailer import RETAILER_MAP
 from tbr_deal_finder.retailer.models import Retailer
 from tbr_deal_finder.utils import get_duckdb_conn, echo_info, echo_err
+
+
+# Write a fresh row for an unchanged price if the last stored record is at least
+# this old, so the price-history chart has continuous data points instead of a
+# single record that never renders a line.
+HEARTBEAT_INTERVAL = timedelta(days=7)
 
 
 def update_retailer_deal_table(config: Config, new_deals: list[Book]):
@@ -30,7 +42,11 @@ def update_retailer_deal_table(config: Config, new_deals: list[Book]):
 
     for deal in new_deals:
         if deal.deal_id in active_deal_map:
-            if deal.current_price != active_deal_map[deal.deal_id].current_price:
+            active_deal = active_deal_map[deal.deal_id]
+            price_changed = deal.current_price != active_deal.current_price
+            stale = (deal.timepoint - active_deal.timepoint) >= HEARTBEAT_INTERVAL
+            if price_changed or stale:
+                deal.is_heartbeat = stale and not price_changed
                 df_data.append(deal.dict())
 
             active_deal_map.pop(deal.deal_id)
@@ -42,7 +58,7 @@ def update_retailer_deal_table(config: Config, new_deals: list[Book]):
 
         db_conn = get_duckdb_conn()
         db_conn.register("_df", df)
-        db_conn.execute("INSERT INTO retailer_deal SELECT * FROM _df;")
+        db_conn.execute("INSERT INTO retailer_deal BY NAME SELECT * FROM _df;")
         db_conn.unregister("_df")
 
 
@@ -262,6 +278,7 @@ async def _get_latest_deals(config: Config):
     _apply_proper_list_prices(books)
     await _apply_proper_current_price(config, books)
     update_retailer_deal_table(config, books)
+    set_tbr_book_covers(books)
     set_unknown_books(config, unknown_books)
 
 
