@@ -9,7 +9,10 @@ permissions:
   
 jobs:
   build-exe:
-    runs-on: windows-latest
+    # Pinned to windows-2022 (VS 2022). windows-latest migrated to VS 2026 in
+    # June 2026, which Flutter 3.29.2 (via flet 0.28.3) doesn't recognize
+    # Revisit once flet/Flutter supports VS 2026 (Flutter >= 3.39.0).
+    runs-on: windows-2022
     env:
       HAS_WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE != '' }}
       HAS_WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD != '' }}
