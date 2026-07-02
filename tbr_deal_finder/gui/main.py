@@ -71,6 +71,9 @@ class TBRDealFinderApp:
         self.page.window.height = 800
         self.page.window.min_width = 800
         self.page.window.min_height = 600
+        # Single global resize slot, routed to whichever page is on screen. Pages
+        # must NOT assign page.on_resized themselves; they expose handle_resize().
+        self.page.on_resized = self._dispatch_resize
 
     def load_config(self):
         """Load configuration or create default"""
@@ -288,6 +291,28 @@ class TBRDealFinderApp:
         """Update the main content area"""
         self.content_area.content = self.get_current_page_content()
         self.page.update()
+
+    def _current_page_object(self):
+        return {
+            self.all_deals_page.page_id(): self.all_deals_page,
+            self.latest_deals_page.page_id(): self.latest_deals_page,
+            self.wishlist_page.page_id(): self.wishlist_page,
+            self.owned_books_page.page_id(): self.owned_books_page,
+            self.book_details_page.page_id(): self.book_details_page,
+            self.settings_page.page_id(): self.settings_page,
+        }.get(self.current_page)
+
+    def _dispatch_resize(self, e=None):
+        """Forward window-resize events to the on-screen page only.
+
+        page.on_resized is a single global slot
+        Routing through the current page keeps resize behavior tied to
+        what's actually visible.
+        """
+        page = self._current_page_object()
+        handler = getattr(page, "handle_resize", None)
+        if handler is not None:
+            handler(e)
     
     def refresh_current_page(self):
         """Refresh the current page by clearing its state and reloading data"""

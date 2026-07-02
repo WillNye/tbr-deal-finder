@@ -217,6 +217,7 @@ class Chirp(AioHttpSession, Retailer):
                 ):
                     target.list_price = currency_to_float(book["currentProduct"]["listingPrice"])
                     target.current_price = currency_to_float(book["currentProduct"]["discountPrice"])
+                    target.image_url = book.get("coverUrl")
                     return target
 
             target.exists = False
@@ -268,6 +269,7 @@ class Chirp(AioHttpSession, Retailer):
                 currentUserAudiobooks(page: $page, pageSize: $pageSize, sort: TITLE_A_Z, clientCapabilities: [CHIRP_AUDIO]) {
                     audiobook {
                         id
+                        coverUrl
                         allAuthors{name}
                         displayTitle
                         displayAuthors
@@ -313,6 +315,7 @@ class Chirp(AioHttpSession, Retailer):
                         current_price=1,
                         timepoint=config.run_time,
                         format=self.format,
+                        image_url=audiobook.get("coverUrl"),
                     )
                 )
 

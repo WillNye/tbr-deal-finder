@@ -12,6 +12,11 @@ from tbr_deal_finder.book import Book, BookFormat, get_normalized_authors, is_ma
 from tbr_deal_finder.utils import currency_to_float, echo_err
 
 
+def _https_url(cover_url: str) -> str:
+    """Libro.fm cover URLs are protocol-relative (//covers.libro.fm/...); prefix https."""
+    return f"https:{cover_url}" if cover_url.startswith("//") else cover_url
+
+
 class LibroFM(AioHttpSession, Retailer):
     BASE_URL = "https://libro.fm/api/v11/"
     USER_AGENT = "okhttp/3.14.9"
@@ -163,6 +168,9 @@ class LibroFM(AioHttpSession, Retailer):
                 and is_matching_authors(book.normalized_authors, normalized_authors)
             ):
                 book.audiobook_isbn = b["isbn"]
+                cover_url = b.get("cover_url")
+                if cover_url:
+                    book.image_url = _https_url(cover_url)
                 break
 
         return book
@@ -184,6 +192,10 @@ class LibroFM(AioHttpSession, Retailer):
                 if response:
                     target.list_price = target.audiobook_list_price
                     target.current_price = currency_to_float(response["data"]["purchase_info"]["price"])
+                    # cover_url is protocol-relative (e.g. //covers.libro.fm/<isbn>_1120.jpg)
+                    cover_url = ((response.get("data") or {}).get("audiobook") or {}).get("cover_url")
+                    if cover_url:
+                        target.image_url = _https_url(cover_url)
                     return target
 
         return None
@@ -235,6 +247,9 @@ class LibroFM(AioHttpSession, Retailer):
             )
 
             for book in response.get("audiobooks", []):
+                cover_url = book.get("cover_url")
+                if cover_url:
+                    cover_url = _https_url(cover_url)
                 library_books.append(
                     Book(
                         retailer=self.name,
@@ -245,6 +260,7 @@ class LibroFM(AioHttpSession, Retailer):
                         timepoint=config.run_time,
                         format=self.format,
                         audiobook_isbn=book["isbn"],
+                        image_url=cover_url,
                     )
                 )
 

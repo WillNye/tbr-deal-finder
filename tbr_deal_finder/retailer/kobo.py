@@ -31,6 +31,15 @@ from tbr_deal_finder.utils import echo_err, get_data_dir
 logger = logging.getLogger(__name__)
 
 
+def _kobo_cover_url(image_id) -> str:
+    """Build a Kobo cover URL from an ImageId.
+
+    Kobo returns only an ImageId; covers are served from a stable CDN template.
+    The plain form yields the full-resolution cover.
+    """
+    return f"https://cdn.kobo.com/book-images/{image_id}/image.jpg"
+
+
 class KoboEbook(AioHttpSession, Retailer):
     STORE_API = "https://storeapi.kobo.com"
     AUTH_HOST = "https://auth.kobobooks.com"
@@ -543,6 +552,9 @@ class KoboEbook(AioHttpSession, Retailer):
                 if member_price is not None:
                     target.alt_price = member_price
 
+                if image_id := book.get("ImageId"):
+                    target.image_url = _kobo_cover_url(image_id)
+
                 target.exists = True
                 return target
 
@@ -593,6 +605,8 @@ class KoboEbook(AioHttpSession, Retailer):
         )
         if member_price is not None:
             book.alt_price = member_price
+        if image_id := product.get("ImageId"):
+            book.image_url = _kobo_cover_url(image_id)
         return book
 
     async def get_wishlist(self, config: Config) -> list[Book]:

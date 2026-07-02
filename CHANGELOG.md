@@ -3,6 +3,17 @@
 
 ---
 
+## 0.4.3 (July 1, 2026)
+
+Notes:
+* Book cover images are now displayed when scrolling books and viewing the details for a book
+* UI improvements
+
+BUG FIXES:
+* Fixed inconsistent behavior with the book details historical pricing graph
+
+---
+
 ## 0.4.2 (June 20, 2026)
 
 Notes:

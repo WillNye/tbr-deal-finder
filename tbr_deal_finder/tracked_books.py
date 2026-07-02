@@ -185,6 +185,8 @@ async def _set_tbr_book_attr(
             tbr_book_attr,
             getattr(enriched_book, target_attr)
         )
+        if enriched_book.image_url and not book.image_url:
+            book.image_url = enriched_book.image_url
 
 
 def _requires_audiobook_list_price(config: Config):
@@ -292,6 +294,40 @@ def set_unknown_books(config: Config, unknown_books: list[Book]):
     db_conn.register("_df", df)
     db_conn.execute("INSERT INTO unknown_book SELECT * FROM _df;")
     db_conn.unregister("_df")
+
+
+def set_tbr_book_covers(books: list[Book]):
+    """Opportunistically persist cover image URLs onto tbr_book.
+    """
+    # Match on title + authors, NOT book_id
+    # so library-export books with format='N/A' are handled correctly
+    cover_map: dict[tuple[str, str], str] = {}
+    for book in books:
+        key = (book.title, book.authors)
+        if book.image_url and key not in cover_map:
+            cover_map[key] = book.image_url
+
+    if not cover_map:
+        return
+
+    df = pd.DataFrame(
+        [
+            {"title": title, "authors": authors, "image_url": url}
+            for (title, authors), url in cover_map.items()
+        ]
+    )
+    db_conn = get_duckdb_conn()
+    db_conn.register("_covers", df)
+    db_conn.execute(
+        """
+        UPDATE tbr_book SET image_url = _covers.image_url
+        FROM _covers
+        WHERE tbr_book.title = _covers.title
+          AND tbr_book.authors = _covers.authors
+          AND tbr_book.image_url IS NULL
+        """
+    )
+    db_conn.unregister("_covers")
 
 
 def get_unknown_books(config: Config) -> list[Book]:
@@ -419,7 +455,7 @@ async def sync_tbr_books(config: Config):
 
     df = pd.DataFrame([book.tbr_dict() for book in new_tbr_books])
     db_conn.register("_df", df)
-    db_conn.execute("INSERT INTO tbr_book SELECT * FROM _df;")
+    db_conn.execute("INSERT INTO tbr_book BY NAME SELECT * FROM _df;")
     db_conn.unregister("_df")
 
 

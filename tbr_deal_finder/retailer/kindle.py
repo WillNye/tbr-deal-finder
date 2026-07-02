@@ -67,6 +67,11 @@ class Kindle(Amazon):
                     continue
                 try:
                     target.ebook_asin = product["asin"]
+                    # KWS returns only the image filename (iFile); Amazon serves it
+                    # from the media CDN. The pricing endpoint carries no cover, so
+                    # this search is the only cover source for Kindle ebooks.
+                    if i_file := product.get("iFile"):
+                        target.image_url = f"https://m.media-amazon.com/images/I/{i_file}"
                     break
                 except KeyError:
                     continue

@@ -4,13 +4,14 @@ import flet as ft
 
 from tbr_deal_finder.book import Book
 from tbr_deal_finder.gui.pages.base_book_page import BaseBookPage
+from tbr_deal_finder.gui.widgets import book_tile_card, cover_image_for_format, truncate_title
 from tbr_deal_finder.owned_books import get_owned_books
 
 logger = logging.getLogger(__name__)
 
 class OwnedBooksPage(BaseBookPage):
     def __init__(self, app):
-        super().__init__(app, items_per_page=6)
+        super().__init__(app, items_per_page=9)
 
     @staticmethod
     def page_id():
@@ -61,31 +62,18 @@ class OwnedBooksPage(BaseBookPage):
 
     def create_item_tile(self, book: Book):
         """Create a non-clickable tile for an owned book"""
-        # Truncate title if too long
-        title = book.title
-        if len(title) > 60:
-            title = f"{title[:60]}..."
-        
-        # Format retailer and format info
         format_text = book.format.value if book.format else "Unknown"
-        
-        return ft.Card(
-            content=ft.Container(
-                content=ft.ListTile(
-                    title=ft.Text(title, weight=ft.FontWeight.BOLD),
-                    subtitle=ft.Column([
-                        ft.Text(f"by {book.authors}", color=ft.Colors.GREY_600),
-                        ft.Row([
-                            ft.Text(f"Format: {format_text}", color=ft.Colors.BLUE_600, size=12),
-                            ft.Text(f"From: {book.retailer}", color=ft.Colors.GREY_500, size=12)
-                        ])
-                    ], spacing=2),
-                    trailing=ft.Column([
-                        ft.Icon(ft.Icons.LIBRARY_BOOKS, color=ft.Colors.GREEN_600, size=20)
-                    ], alignment=ft.MainAxisAlignment.CENTER),
-                    # No on_click handler - tiles are not clickable
-                ),
-                padding=10,
-                # No on_click handler - container is not clickable
-            )
+
+        # No on_click handler - owned tiles are not clickable
+        return book_tile_card(
+            cover_image_for_format(book.image_url, book.format),
+            [
+                ft.Text(truncate_title(book.title), weight=ft.FontWeight.BOLD),
+                ft.Text(f"by {book.authors}", color=ft.Colors.GREY_600),
+                ft.Row([
+                    ft.Text(f"Format: {format_text}", color=ft.Colors.BLUE_600, size=12),
+                    ft.Text(f"From: {book.retailer}", color=ft.Colors.GREY_500, size=12)
+                ], wrap=True, spacing=8),
+            ],
+            trailing=ft.Icon(ft.Icons.LIBRARY_BOOKS, color=ft.Colors.GREEN_600, size=20),
         )

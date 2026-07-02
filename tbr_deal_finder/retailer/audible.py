@@ -53,6 +53,8 @@ class Audible(Amazon):
                             if "Minerva" in plan.get("plan_name"):
                                 target.current_price = 0
 
+                    target.image_url = (product.get("product_images") or {}).get("500")
+
                     target.exists = True
                     return target
                 except KeyError:
@@ -109,7 +111,7 @@ class Audible(Amazon):
                 num_results=page_size,
                 page=page,
                 response_groups=[
-                    "contributors, product_attrs, product_desc, product_extended_attrs"
+                    "contributors, media, product_attrs, product_desc, product_extended_attrs"
                 ]
             )
 
@@ -125,6 +127,7 @@ class Audible(Amazon):
                         timepoint=config.run_time,
                         format=self.format,
                         audiobook_isbn=audiobook["isbn"],
+                        image_url=(audiobook.get("product_images") or {}).get("500"),
                     )
                 )
 
