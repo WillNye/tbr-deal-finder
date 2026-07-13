@@ -38,6 +38,7 @@ class Book:
         is_internal: bool = False,
         disable_price_tracking: bool = False,
         image_url: str = None,
+        product_url: str = None,
         is_heartbeat: bool = False,
     ):
         self.retailer = retailer
@@ -65,6 +66,10 @@ class Book:
         # Cover image URL.
         # Filled once on tbr_book and never overwritten.
         self.image_url = image_url
+
+        # Retailer product-page URL for this deal (retailer/format specific).
+        # Set at fetch time by each retailer's get_book; may be None.
+        self.product_url = product_url
 
         # For to keep price history dense while the price holds steady
         self.is_heartbeat = is_heartbeat
@@ -148,6 +153,7 @@ class Book:
             "deal_id": self.deal_id,
             "is_internal": self.is_internal,
             "is_heartbeat": self.is_heartbeat,
+            "product_url": self.product_url,
         }
 
     def tbr_dict(self):

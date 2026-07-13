@@ -111,6 +111,7 @@ class Kindle(Amazon):
                         target.list_price = action["offer"]["printListPrice"]["value"]
                         target.current_price = action["offer"]["digitalPrice"]["value"]
                         target.exists = True
+                        target.product_url = f"{self._get_base_url()}/dp/{asin}"
                     elif action.get("actionProgram", {}).get("programCode") == "KINDLE_UNLIMITED":
                         target.alt_price = 0
 

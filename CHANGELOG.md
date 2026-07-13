@@ -3,6 +3,13 @@
 
 ---
 
+## 0.4.4 (July 13, 2026)
+
+Notes:
+* Add links to view a deal on the retailer's website
+
+---
+
 ## 0.4.3 (July 1, 2026)
 
 Notes:

@@ -196,6 +196,12 @@ class LibroFM(AioHttpSession, Retailer):
                     cover_url = ((response.get("data") or {}).get("audiobook") or {}).get("cover_url")
                     if cover_url:
                         target.image_url = _https_url(cover_url)
+                    # audiobook_isbn can arrive as a float-ish string (e.g.
+                    # '9781797160139.0') when it round-trips through the stored
+                    # tbr_book table; float() then int() normalizes both that
+                    # and a clean digit string. ISBNs are < 2**53, so exact.
+                    isbn = int(float(target.audiobook_isbn))
+                    target.product_url = f"https://libro.fm/audiobooks/{isbn}"
                     return target
 
         return None

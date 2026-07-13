@@ -45,8 +45,9 @@ def update_retailer_deal_table(config: Config, new_deals: list[Book]):
             active_deal = active_deal_map[deal.deal_id]
             price_changed = deal.current_price != active_deal.current_price
             stale = (deal.timepoint - active_deal.timepoint) >= HEARTBEAT_INTERVAL
-            if price_changed or stale:
-                deal.is_heartbeat = stale and not price_changed
+            product_url_changed = deal.product_url != active_deal.product_url
+            if price_changed or stale or product_url_changed:
+                deal.is_heartbeat = not price_changed
                 df_data.append(deal.dict())
 
             active_deal_map.pop(deal.deal_id)

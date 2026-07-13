@@ -40,6 +40,32 @@ def _kobo_cover_url(image_id) -> str:
     return f"https://cdn.kobo.com/book-images/{image_id}/image.jpg"
 
 
+# Kobo storefront path segments per app locale. Only locales whose
+# {country}/{lang} are browser-verified are included; anything else yields no
+# URL (button hidden) rather than a guessed link that could 404.
+_KOBO_LOCALE_PATH = {
+    "us": ("us", "en"),
+    "ca": ("ca", "en"),
+    "au": ("au", "en"),
+    "de": ("de", "de"),
+    "fr": ("fr", "fr"),
+    "it": ("it", "it"),
+    "es": ("es", "es"),
+    "in": ("in", "en"),
+    # Deliberately omitted (unverified): uk (gb?), jp, br.
+}
+
+
+def _kobo_store_url(store_type: str, slug: Optional[str]) -> Optional[str]:
+    """Build a Kobo storefront URL from the API's Slug (used verbatim, trailing
+    int included). Returns None for unconfident locales or a missing slug."""
+    path = _KOBO_LOCALE_PATH.get(Config.locale)
+    if not path or not slug:
+        return None
+    country, lang = path
+    return f"https://www.kobo.com/{country}/{lang}/{store_type}/{slug}"
+
+
 class KoboEbook(AioHttpSession, Retailer):
     STORE_API = "https://storeapi.kobo.com"
     AUTH_HOST = "https://auth.kobobooks.com"
@@ -66,6 +92,7 @@ class KoboEbook(AioHttpSession, Retailer):
     # `typesToInclude` value the /v1/products search filters on. Mirrors the
     # official client's ProductSearchType ("book" / "audiobook").
     _search_type = "book"
+    store_type = "ebook"
 
     def __init__(self):
         super().__init__()
@@ -555,6 +582,8 @@ class KoboEbook(AioHttpSession, Retailer):
                 if image_id := book.get("ImageId"):
                     target.image_url = _kobo_cover_url(image_id)
 
+                target.product_url = _kobo_store_url(self.store_type, book.get("Slug"))
+
                 target.exists = True
                 return target
 
@@ -677,6 +706,7 @@ class KoboAudiobook(KoboEbook):
     _entitlement_key = "AudiobookMetadata"
     _product_metadata_key = "Audiobook"
     _search_type = "audiobook"
+    store_type = "audiobook"
 
     @property
     def name(self) -> str:

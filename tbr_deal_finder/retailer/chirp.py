@@ -218,6 +218,11 @@ class Chirp(AioHttpSession, Retailer):
                     target.list_price = currency_to_float(book["currentProduct"]["listingPrice"])
                     target.current_price = currency_to_float(book["currentProduct"]["discountPrice"])
                     target.image_url = book.get("coverUrl")
+                    if chirp_url := book.get("url"):
+                        target.product_url = (
+                            chirp_url if chirp_url.startswith("http")
+                            else f"https://www.chirpbooks.com{chirp_url}"
+                        )
                     return target
 
             target.exists = False
