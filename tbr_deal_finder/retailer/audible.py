@@ -54,6 +54,7 @@ class Audible(Amazon):
                                 target.current_price = 0
 
                     target.image_url = (product.get("product_images") or {}).get("500")
+                    target.product_url = f"https://www.audible.{self._auth.locale.domain}/pd/{product['asin']}"
 
                     target.exists = True
                     return target

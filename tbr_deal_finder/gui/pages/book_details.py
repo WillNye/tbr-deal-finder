@@ -503,30 +503,46 @@ class BookDetailsPage:
         else:
             discount_color = ft.Colors.RED
         
+        card_items = [
+            ft.Text(deal.retailer, weight=ft.FontWeight.BOLD, size=16),
+            ft.Text(
+                deal.current_price_string(),
+                size=20,
+                weight=ft.FontWeight.BOLD,
+                color=ft.Colors.GREEN
+            ),
+            ft.Text(f"was {deal.list_price_string()}", color=ft.Colors.GREY_500),
+            ft.Container(
+                content=ft.Text(
+                    f"{discount}% OFF",
+                    color=ft.Colors.WHITE,
+                    weight=ft.FontWeight.BOLD,
+                    size=12
+                ),
+                bgcolor=discount_color,
+                border_radius=8,
+                padding=ft.padding.symmetric(8, 4),
+                alignment=ft.alignment.center
+            ),
+        ]
+
+        if deal.product_url:
+            url = deal.product_url
+            card_items.append(
+                ft.TextButton(
+                    "View deal ↗",
+                    tooltip=f"Open on {deal.retailer}",
+                    on_click=lambda e, u=url: self.app.page.launch_url(u),
+                )
+            )
+
         return ft.Card(
             content=ft.Container(
-                content=ft.Column([
-                    ft.Text(deal.retailer, weight=ft.FontWeight.BOLD, size=16),
-                    ft.Text(
-                        deal.current_price_string(),
-                        size=20,
-                        weight=ft.FontWeight.BOLD,
-                        color=ft.Colors.GREEN
-                    ),
-                    ft.Text(f"was {deal.list_price_string()}", color=ft.Colors.GREY_500),
-                    ft.Container(
-                        content=ft.Text(
-                            f"{discount}% OFF",
-                            color=ft.Colors.WHITE,
-                            weight=ft.FontWeight.BOLD,
-                            size=12
-                        ),
-                        bgcolor=discount_color,
-                        border_radius=8,
-                        padding=ft.padding.symmetric(8, 4),
-                        alignment=ft.alignment.center
-                    )
-                ], spacing=5, horizontal_alignment=ft.CrossAxisAlignment.CENTER),
+                content=ft.Column(
+                    card_items,
+                    spacing=5,
+                    horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                ),
                 padding=15,
                 width=150
             )

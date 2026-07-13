@@ -123,6 +123,13 @@ _MIGRATIONS = [
             ALTER TABLE retailer_deal ADD COLUMN is_heartbeat BOOLEAN DEFAULT FALSE;
             """
     ),
+    TableMigration(
+        version=6,
+        table_name="retailer_deal",
+        sql="""
+            ALTER TABLE retailer_deal ADD COLUMN product_url VARCHAR;
+            """
+    ),
 ]
 
 

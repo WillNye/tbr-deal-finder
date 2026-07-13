@@ -165,12 +165,7 @@ class LatestDealsPage(BaseDealsPage):
                 ft.Text(f"by {deal.authors}", color=ft.Colors.GREY_600),
                 ft.Text(price_text, color=ft.Colors.GREEN, weight=ft.FontWeight.BOLD),
             ],
-            overlay=ft.IconButton(
-                icon=ft.Icons.VISIBILITY,
-                tooltip="Toggle price tracking",
-                on_click=lambda e, book=deal: self.show_price_tracking_dialog(book),
-                icon_size=20
-            ),
+            overlay=self._deal_actions_overlay(deal),
             on_click=lambda e, book=deal: self.app.show_book_details(book, format_type=book.format),
         )
 
