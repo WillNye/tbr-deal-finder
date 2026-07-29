@@ -3,6 +3,13 @@
 
 ---
 
+## 0.4.5 (July 29, 2026)
+
+BUG Fixes:
+* Resolve issue where a crash report is displayed when closing app on mac.
+
+---
+
 ## 0.4.4 (July 13, 2026)
 
 Notes:

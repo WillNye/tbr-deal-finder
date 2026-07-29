@@ -16,6 +16,33 @@ _db_conn = None
 _lock = Lock()
 
 
+def release_duckdb_default_connection():
+    """Drop duckdb's module-level "default connection" so process exit is safe.
+
+    duckdb >= 1.4 creates a hidden default connection as soon as the module is
+    imported. It is owned by a C++ static whose destructor runs during exit()
+    (__cxa_finalize) and calls PyEval_SaveThread. In the packaged Flet app,
+    Flutter calls exit() from the AppKit main thread — a thread with no Python
+    thread state — so that destructor aborts the process with
+    "Fatal Python error: PyEval_SaveThread" (SIGABRT on every app close).
+
+    duckdb ships its own cleanup as a PyCapsule (`_clean_default_connection`)
+    whose destructor empties the static holder; it normally fires during
+    interpreter shutdown, which never happens when Flutter exits the process
+    directly. Dropping every module reference to the capsule runs that cleanup
+    now, leaving nothing for __cxa_finalize to destroy.
+
+    Safe to call on duckdb < 1.4 (no capsule, no eager default connection) and
+    a no-op there. Explicit `duckdb.connect(path)` connections are unaffected.
+    Nothing in this app may use duckdb's module-level query API afterwards, as
+    that would silently re-create the default connection.
+    """
+    for mod_name in ("duckdb", "_duckdb"):
+        mod = sys.modules.get(mod_name)
+        if mod is not None and hasattr(mod, "_clean_default_connection"):
+            delattr(mod, "_clean_default_connection")
+
+
 @functools.cache
 def is_gui_env() -> bool:
     return os.environ.get("ENTRYPOINT", "GUI") == "GUI"
