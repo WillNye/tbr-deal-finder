@@ -23,7 +23,11 @@ from tbr_deal_finder.gui.pages.latest_deals import LatestDealsPage
 from tbr_deal_finder.gui.pages.wishlist import WishlistPage
 from tbr_deal_finder.gui.pages.owned_books import OwnedBooksPage
 from tbr_deal_finder.gui.pages.book_details import BookDetailsPage
-from tbr_deal_finder.utils import get_duckdb_conn, get_latest_deal_last_ran
+from tbr_deal_finder.utils import (
+    get_duckdb_conn,
+    get_latest_deal_last_ran,
+    release_duckdb_default_connection,
+)
 
 
 class TBRDealFinderApp:
@@ -927,6 +931,9 @@ class TBRDealFinderApp:
 def main():
     """Main entry point for the GUI application"""
     os.environ.setdefault("ENTRYPOINT", "GUI")
+    # Must run before the window opens: the packaged app terminates via a raw
+    # exit() from Flutter, which crashes if duckdb's default connection exists.
+    release_duckdb_default_connection()
     make_migrations()
 
     def app_main(page: ft.Page):
