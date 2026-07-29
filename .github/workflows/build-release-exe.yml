@@ -127,13 +127,32 @@ jobs:
 
     - name: Install Inno Setup
       run: |
-        # Download and install Inno Setup silently
-        Invoke-WebRequest -Uri "https://jrsoftware.org/download.php/is.exe" -OutFile "innosetup.exe"
-        Start-Process -FilePath ".\innosetup.exe" -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/SP-" -Wait
-        
+        # As of March 2026 jrsoftware.org/download.php/is.exe redirects to an HTML
+        # download page, so pin the immutable GitHub release asset instead.
+        $url = "https://github.com/jrsoftware/issrc/releases/download/is-6_7_3/innosetup-6.7.3.exe"
+        Invoke-WebRequest -Uri $url -OutFile "innosetup.exe"
+
+        # Fail loudly here if we got an HTML page instead of a PE binary
+        $header = [System.IO.File]::ReadAllBytes("innosetup.exe")[0..1]
+        if ($header[0] -ne 0x4D -or $header[1] -ne 0x5A) {
+          Write-Error "Downloaded innosetup.exe is not a Windows executable (missing 'MZ' header). $url may have changed."
+          exit 1
+        }
+
+        $proc = Start-Process -FilePath ".\innosetup.exe" -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/SP-" -Wait -PassThru
+        if ($proc.ExitCode -ne 0) {
+          Write-Error "Inno Setup installer exited with code $($proc.ExitCode)"
+          exit 1
+        }
+
+        if (-not (Test-Path "C:\Program Files (x86)\Inno Setup 6\ISCC.exe")) {
+          Write-Error "ISCC.exe not found after install"
+          exit 1
+        }
+
         # Add to PATH for current session
         $env:PATH += ";C:\Program Files (x86)\Inno Setup 6"
-        
+
         Write-Output "✅ Inno Setup installed successfully"
 
     - name: Create InnoSetup Script
