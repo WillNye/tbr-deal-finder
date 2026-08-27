@@ -1277,7 +1277,7 @@ wheels = [
 
 [[package]]
 name = "tbr-deal-finder"
-version = "0.4.5"
+version = "0.4.6"
 source = { editable = "." }
 dependencies = [
     { name = "aiocache" },

@@ -3,6 +3,13 @@
 
 ---
 
+## 0.4.6 (August 27, 2026)
+
+BUG Fixes:
+* Fix issue where deals are still tracked for owned translated books.
+
+---
+
 ## 0.4.5 (July 29, 2026)
 
 BUG Fixes:

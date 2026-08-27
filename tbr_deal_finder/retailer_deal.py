@@ -6,6 +6,7 @@ from datetime import timedelta
 import pandas as pd
 
 from tbr_deal_finder.book import Book, get_active_deals, BookFormat
+from tbr_deal_finder.book_match import BookMatchIndex
 from tbr_deal_finder.config import Config
 from tbr_deal_finder.owned_books import get_owned_books
 from tbr_deal_finder.tracked_books import (
@@ -158,23 +159,27 @@ def _apply_proper_list_prices(books: list[Book]):
 
 
 async def _apply_proper_current_price_audible(config: Config, books: list[Book]):
-    whispersync_books = {
-        b.full_title_str for b
-        in await get_owned_books(config)
-        if b.retailer == "Kindle"
-    }
+    # Loosely matched for the same reason owned-book suppression is: the Kindle
+    # and Audible editions of a book rarely agree on the author list.
+    whispersync_books = BookMatchIndex(
+        (
+            b for b in await get_owned_books(config)
+            if b.retailer == "Kindle"
+        ),
+        label="whispersync",
+    )
 
     if config.is_kindle_unlimited_member:
         for b in books:
             if b.retailer == "Kindle" and b.alt_price == 0:
-                whispersync_books.add(b.full_title_str)
+                whispersync_books.add(b)
 
     for b in books:
         if (
             b.retailer == "Audible"
             and b.alt_price is not None
             and b.current_price > b.alt_price
-            and b.full_title_str in whispersync_books
+            and b in whispersync_books
         ):
             b.current_price = b.alt_price
 
