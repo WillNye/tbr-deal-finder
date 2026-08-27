@@ -2,7 +2,6 @@ import asyncio
 import copy
 import csv
 import functools
-from collections import defaultdict
 from datetime import datetime, timedelta
 from typing import Callable, Awaitable, Optional
 
@@ -10,6 +9,7 @@ import pandas as pd
 from tqdm.asyncio import tqdm_asyncio
 
 from tbr_deal_finder.book import Book, BookFormat, get_title_id
+from tbr_deal_finder.book_match import BookMatchIndex
 from tbr_deal_finder.owned_books import get_owned_books
 from tbr_deal_finder.retailer import Chirp, RETAILER_MAP, LibroFM, Kindle
 from tbr_deal_finder.config import Config
@@ -104,12 +104,16 @@ async def _get_raw_tbr_books(config: Config) -> list[Book]:
 
     response: list[Book] = []
 
-    owned_book_title_map: dict[str, dict] = defaultdict(dict[BookFormat, str])
-    for book in owned_books:
-        owned_book_title_map[book.full_title_str][book.format] = book.retailer
+    # Matched loosely on purpose: retailers credit translators, narrators and
+    # imprints alongside the author, and titles disagree on numerals, so an
+    # exact title+author comparison lets books the user owns back onto the TBR.
+    owned_index = BookMatchIndex(owned_books, label="owned book")
+
+    def owned_formats_for(book: Book) -> dict[BookFormat, str]:
+        return {owned.format: owned.retailer for owned in owned_index.matches(book)}
 
     for book in raw_tbr_books:
-        owned_formats = owned_book_title_map.get(book.full_title_str)
+        owned_formats = owned_formats_for(book)
         if not owned_formats:
             response.append(book)
         elif BookFormat.NA in owned_formats:
@@ -129,7 +133,7 @@ async def _get_raw_tbr_books(config: Config) -> list[Book]:
         }
         internal_books = []
         for book in response:
-            owned_formats = owned_book_title_map.get(book.full_title_str)
+            owned_formats = owned_formats_for(book)
 
             if (
                 book.format != BookFormat.AUDIOBOOK
