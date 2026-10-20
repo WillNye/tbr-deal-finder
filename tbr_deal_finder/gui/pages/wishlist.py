@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 class WishlistPage(BaseBookPage):
     def __init__(self, app):
-        super().__init__(app, items_per_page=9)
+        super().__init__(app)
 
     @staticmethod
     def page_id():

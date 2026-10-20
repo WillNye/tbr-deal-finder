@@ -1,3 +1,4 @@
+import dataclasses
 import re
 from datetime import datetime
 from enum import Enum
@@ -17,6 +18,13 @@ class BookFormat(Enum):
     AUDIOBOOK = "Audiobook"
     EBOOK = "E-Book"
     NA = "N/A"  # When the format doesn't matter
+
+
+@dataclasses.dataclass(frozen=True, order=True)
+class CustomDeal:
+    deal_type: str
+    details: Optional[str] = None
+    override_price_enforcement: bool = False
 
 
 class Book:
@@ -40,6 +48,9 @@ class Book:
         image_url: str = None,
         product_url: str = None,
         is_heartbeat: bool = False,
+        custom_deal_type: str = None,
+        custom_deal_details: str = None,
+        override_price_enforcement: bool = False,
     ):
         self.retailer = retailer
         self.title = get_normalized_title(title)
@@ -73,6 +84,13 @@ class Book:
 
         # For to keep price history dense while the price holds steady
         self.is_heartbeat = is_heartbeat
+
+        # Non-standard deal context, e.g. "2 for 1 Credit" or "Whispersync".
+        self.custom_deal_type = custom_deal_type
+        # How the deal works, e.g. that the shown price includes buying the ebook.
+        self.custom_deal_details = custom_deal_details
+        # Qualify the deal regardless of max price and min discount (e.g. credit deals).
+        self.override_price_enforcement = bool(override_price_enforcement)
 
         self.list_price = list_price
         self.current_price = current_price
@@ -126,6 +144,17 @@ class Book:
     def list_price(self, price: float):
         self._list_price = round(price, 2)
 
+    def set_custom_deal(self, deals: list[CustomDeal]):
+        """Apply one of the retailer's non-standard deals, or clear them if there are none.
+
+        Only one deal is shown per retailer book; overlapping promotions are rare enough
+        that picking a deterministic one is acceptable.
+        """
+        deal = sorted(deals)[0] if deals else None
+        self.custom_deal_type = deal.deal_type if deal else None
+        self.custom_deal_details = deal.details if deal else None
+        self.override_price_enforcement = deal.override_price_enforcement if deal else False
+
     def list_price_string(self):
         return float_to_currency(self.list_price)
 
@@ -138,7 +167,10 @@ class Book:
         title = self.title
         if len(self.title) > 75:
             title = f"{title[:75]}..."
-        return f"{title} by {self.authors} - {price} - {self.discount()}% Off at {self.retailer}"
+        deal_str = f"{title} by {self.authors} - {price} - {self.discount()}% Off at {self.retailer}"
+        if self.custom_deal_type:
+            deal_str = f"{deal_str} [{self.custom_deal_type}]"
+        return deal_str
 
     def dict(self):
         return {
@@ -154,6 +186,9 @@ class Book:
             "is_internal": self.is_internal,
             "is_heartbeat": self.is_heartbeat,
             "product_url": self.product_url,
+            "custom_deal_type": self.custom_deal_type,
+            "custom_deal_details": self.custom_deal_details,
+            "override_price_enforcement": self.override_price_enforcement,
         }
 
     def tbr_dict(self):
@@ -229,17 +264,20 @@ def get_deals_found_at(timepoint: datetime) -> list[Book]:
     return [Book(**book) for book in query_response]
 
 
-def get_active_deals() -> list[Book]:
+def get_active_deals(include_internal: bool = False) -> list[Book]:
     db_conn = get_duckdb_conn()
     prune_retailer_deal_table(db_conn)
     query_response = execute_query(
         db_conn,
-        get_query_by_name("get_active_deals.sql")
+        get_query_by_name("get_active_deals.sql"),
+        {"include_internal": include_internal}
     )
     return [Book(**book) for book in query_response]
 
 
 def is_qualifying_deal(config: Config, book: Book) -> bool:
+    if book.override_price_enforcement:
+        return True
     return book.current_price <= config.max_price and book.discount() >= config.min_discount
 
 

@@ -11,7 +11,7 @@ import click
 
 from tbr_deal_finder.config import Config
 from tbr_deal_finder.retailer.models import AioHttpSession, Retailer, GuiAuthContext
-from tbr_deal_finder.book import Book, BookFormat, get_normalized_authors, is_matching_authors
+from tbr_deal_finder.book import Book, BookFormat, CustomDeal, get_normalized_authors, is_matching_authors
 from tbr_deal_finder.utils import currency_to_float, echo_err
 
 
@@ -217,6 +217,7 @@ class Chirp(AioHttpSession, Retailer):
                 ):
                     target.list_price = currency_to_float(book["currentProduct"]["listingPrice"])
                     target.current_price = currency_to_float(book["currentProduct"]["discountPrice"])
+                    target.set_custom_deal(self.get_custom_deals(book))
                     target.image_url = book.get("coverUrl")
                     if chirp_url := book.get("url"):
                         target.product_url = (
@@ -227,6 +228,11 @@ class Chirp(AioHttpSession, Retailer):
 
             target.exists = False
             return target
+
+    def get_custom_deals(self, product: dict) -> list[CustomDeal]:
+        # Stub until a live promotion's payload has been captured.
+        # currentProduct.bannerType is the likeliest field.
+        return []
 
     async def get_wishlist(self, config: Config) -> list[Book]:
         wishlist_books = []

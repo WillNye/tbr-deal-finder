@@ -125,7 +125,9 @@ async def _get_raw_tbr_books(config: Config) -> list[Book]:
             book.format = BookFormat.EBOOK
             response.append(book)
 
-    if config.is_kindle_unlimited_member:
+    # Whispersync pricing for Audible needs the Kindle ebook price, so look it up
+    # (internally, without showing it as a deal) for audiobook-only TBR books.
+    if {"Audible", "Kindle"}.issubset(config.tracked_retailers):
         tbr_ebooks = {
             book.full_title_str
             for book in response
@@ -138,11 +140,11 @@ async def _get_raw_tbr_books(config: Config) -> list[Book]:
             if (
                 book.format != BookFormat.AUDIOBOOK
                 or book.full_title_str in tbr_ebooks
-                or (owned_formats and "Kindle" not in owned_formats[BookFormat.EBOOK])
+                # An owned Kindle ebook already qualifies; no price lookup needed.
+                or owned_formats.get(BookFormat.EBOOK) == "Kindle"
             ):
                 continue
 
-            # Check for whispersync pricing
             internal_book = copy.deepcopy(book)
             internal_book.format = BookFormat.EBOOK
             internal_book.is_internal = True
@@ -347,11 +349,13 @@ def get_unknown_books(config: Config) -> list[Book]:
     return [Book(timepoint=config.run_time, **b) for b in unknown_book_data]
 
 
-async def _maybe_set_ebook_asin(config: Config, new_tbr_books: list[Book]):
+async def _maybe_set_ebook_asin(config: Config, new_tbr_books: list[Book]) -> set[str]:
     """To get the price from kindle for a book, you need its asin
+
+    Returns the full_title_str of books whose search was skipped because Amazon throttled us.
     """
     if "Kindle" not in config.tracked_retailers:
-        return
+        return set()
 
     kindle = Kindle()
     await kindle.set_auth()
@@ -367,6 +371,7 @@ async def _maybe_set_ebook_asin(config: Config, new_tbr_books: list[Book]):
         "ebook_asin",
         kindle.get_book_asin,
     )
+    return kindle.skipped_asin_searches
 
 
 def get_book_authors(book: dict) -> str:
@@ -455,7 +460,15 @@ async def sync_tbr_books(config: Config):
 
     await _maybe_set_audiobook_list_price(config, new_tbr_books)
     await _maybe_set_audiobook_isbn(config, new_tbr_books)
-    await _maybe_set_ebook_asin(config, new_tbr_books)
+    skipped_asin_searches = await _maybe_set_ebook_asin(config, new_tbr_books)
+    # Left out so the next sync sees them as new and retries the search, instead of
+    # storing them as if they weren't on Kindle.
+    new_tbr_books = [
+        b for b in new_tbr_books
+        if b.format == BookFormat.AUDIOBOOK or b.full_title_str not in skipped_asin_searches
+    ]
+    if not new_tbr_books:
+        return
 
     df = pd.DataFrame([book.tbr_dict() for book in new_tbr_books])
     db_conn.register("_df", df)

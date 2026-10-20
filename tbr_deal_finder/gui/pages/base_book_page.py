@@ -11,12 +11,12 @@ from tbr_deal_finder.utils import get_duckdb_conn
 class BaseBookPage(ABC):
     """Base class for pages that display lists of books with pagination, search, and filtering."""
     
-    def __init__(self, app, items_per_page: int):
+    def __init__(self, app, rows_per_page: int = 3):
         self.app = app
         self.items = []
         self.filtered_items = []
         self.current_page = 0
-        self.items_per_page = items_per_page
+        self.rows_per_page = rows_per_page
         self.search_query = ""
         self.format_filter = "All"
         self.price_filter = app.config.max_price if app.config else 8
@@ -50,6 +50,19 @@ class BaseBookPage(ABC):
         """Return available format filter options. Override if needed."""
         return ["All", "E-Book", "Audiobook"]
     
+    @property
+    def items_per_page(self) -> int:
+        # Whole rows at the current column count, so a page never ends on a partial row.
+        return self.rows_per_page * self._grid_columns()
+
+    def get_header_actions(self) -> List[ft.Control]:
+        """Page-specific controls shown beside the title. Override if needed."""
+        return []
+
+    def get_extra_filter_controls(self) -> List[ft.Control]:
+        """Additional filter controls shown after the format dropdown. Override if needed."""
+        return []
+
     def should_include_refresh_button(self) -> bool:
         """Whether to include a refresh button. Override if needed."""
         return True
@@ -78,6 +91,8 @@ class BaseBookPage(ABC):
         if not self.items and not self.is_loading:
             self.load_items()
         
+        title_row = self.build_title_row()
+
         # Items list container that we can update without rebuilding search controls
         self.items_container = ft.Container()
         self.pagination_container = ft.Container()
@@ -86,12 +101,21 @@ class BaseBookPage(ABC):
         self.update_items_display()
         
         return ft.Column([
-            ft.Text(self.get_page_title(), size=24, weight=ft.FontWeight.BOLD),
+            title_row,
             search_controls,
             self.loading_container,
             self.items_container,
             self.pagination_container
         ], spacing=20, scroll=ft.ScrollMode.AUTO)
+
+    def build_title_row(self) -> ft.Row:
+        """Page title with the page's actions beside it."""
+        return ft.Row(
+            [ft.Text(self.get_page_title(), size=24, weight=ft.FontWeight.BOLD), *self.get_header_actions()],
+            spacing=15,
+            vertical_alignment=ft.CrossAxisAlignment.CENTER,
+            wrap=True,
+        )
 
     def build_search_controls(self):
         """Build search and filter controls"""
@@ -111,7 +135,7 @@ class BaseBookPage(ABC):
             width=150
         )
         
-        controls = [self.search_field, self.format_dropdown]
+        controls = [self.search_field, self.format_dropdown, *self.get_extra_filter_controls()]
 
         if self.get_page_title() == "All Active Deals":
             self.price_title = ft.Text(f"Max Price: {self.price_filter}", size=12, text_align=ft.TextAlign.CENTER)
@@ -173,13 +197,31 @@ class BaseBookPage(ABC):
             padding=10
         )
 
+    def _total_pages(self) -> int:
+        return (len(self.filtered_items) + self.items_per_page - 1) // self.items_per_page
+
+    def build_page_nav(self) -> ft.Row:
+        """Previous / page number / next controls."""
+        total_pages = self._total_pages()
+        return ft.Row([
+            ft.IconButton(
+                icon=ft.Icons.CHEVRON_LEFT,
+                on_click=self.prev_page,
+                disabled=self.current_page == 0
+            ),
+            ft.Text(f"Page {self.current_page + 1} of {total_pages}", weight=ft.FontWeight.BOLD),
+            ft.IconButton(
+                icon=ft.Icons.CHEVRON_RIGHT,
+                on_click=self.next_page,
+                disabled=self.current_page >= total_pages - 1
+            ),
+        ], spacing=5, tight=True)
+
     def build_pagination(self):
         """Build pagination controls"""
         if not self.filtered_items or self.is_loading:
             return ft.Container()
-        
-        total_pages = (len(self.filtered_items) + self.items_per_page - 1) // self.items_per_page
-        
+
         # Page info
         start_item = self.current_page * self.items_per_page + 1
         end_item = min((self.current_page + 1) * self.items_per_page, len(self.filtered_items))
@@ -189,27 +231,9 @@ class BaseBookPage(ABC):
             color=ft.Colors.GREY_600
         )
         
-        # Navigation buttons
-        prev_button = ft.IconButton(
-            icon=ft.Icons.CHEVRON_LEFT,
-            on_click=self.prev_page,
-            disabled=self.current_page == 0
-        )
-        
-        next_button = ft.IconButton(
-            icon=ft.Icons.CHEVRON_RIGHT,
-            on_click=self.next_page,
-            disabled=self.current_page >= total_pages - 1
-        )
-        
-        page_number = ft.Text(
-            f"Page {self.current_page + 1} of {total_pages}",
-            weight=ft.FontWeight.BOLD
-        )
-        
         return ft.Row([
             page_info,
-            ft.Row([prev_button, page_number, next_button], spacing=5)
+            self.build_page_nav()
         ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN)
 
     def apply_filters(self):
@@ -225,6 +249,7 @@ class BaseBookPage(ABC):
             filtered = self.filter_by_format(filtered, self.format_filter)
 
         filtered = self.filter_by_price(filtered)
+        filtered = self.apply_extra_filters(filtered)
         
         # Apply custom sorting
         self.filtered_items = self.sort_items(filtered)
@@ -250,7 +275,14 @@ class BaseBookPage(ABC):
         return [item for item in items if item.format == format_value]
 
     def filter_by_price(self, items: List[Book]) -> List[Book]:
-        return [item for item in items if item.current_price <= self.price_filter]
+        return [
+            item for item in items
+            if item.override_price_enforcement or item.current_price <= self.price_filter
+        ]
+
+    def apply_extra_filters(self, items: List[Book]) -> List[Book]:
+        """Filters applied after the standard ones. Override if needed."""
+        return items
 
     def sort_items(self, items: List[Book]) -> List[Book]:
         """Sort items. Override to customize sorting."""
@@ -284,8 +316,7 @@ class BaseBookPage(ABC):
 
     def next_page(self, e):
         """Go to next page"""
-        total_pages = (len(self.filtered_items) + self.items_per_page - 1) // self.items_per_page
-        if self.current_page < total_pages - 1:
+        if self.current_page < self._total_pages() - 1:
             self.current_page += 1
             self.update_items_display()
 
@@ -315,7 +346,12 @@ class BaseBookPage(ABC):
 
         Invoked by the app's global resize dispatcher for the visible page.
         """
-        if self._grid_columns() != getattr(self, "_last_grid_columns", None):
+        last_columns = getattr(self, "_last_grid_columns", None)
+        if self._grid_columns() != last_columns:
+            if last_columns:
+                # Page size follows the column count; stay on the page holding the first visible book.
+                first_visible = self.current_page * self.rows_per_page * last_columns
+                self.current_page = first_visible // self.items_per_page
             self.update_items_display()
 
     def set_loading(self, loading: bool):

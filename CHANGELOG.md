@@ -3,6 +3,17 @@
 
 ---
 
+## 0.5.0 (October 19, 2026)
+
+Notes:
+* Improved Whispersync support to use total cost instead of only offering Whispersync for KU books
+* Notify user when a deal is Whispersync and what that means
+
+BUG Fixes:
+* Resolve throttling issues with Kindle causing crashes
+
+---
+
 ## 0.4.6 (August 27, 2026)
 
 BUG Fixes:
