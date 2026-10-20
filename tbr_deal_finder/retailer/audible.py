@@ -4,7 +4,7 @@ from typing import Union
 
 from tbr_deal_finder.config import Config
 from tbr_deal_finder.retailer.amazon import Amazon
-from tbr_deal_finder.book import Book, BookFormat, get_normalized_title
+from tbr_deal_finder.book import Book, BookFormat, CustomDeal, get_normalized_title
 
 
 class Audible(Amazon):
@@ -53,6 +53,7 @@ class Audible(Amazon):
                             if "Minerva" in plan.get("plan_name"):
                                 target.current_price = 0
 
+                    target.set_custom_deal(self.get_custom_deals(product))
                     target.image_url = (product.get("product_images") or {}).get("500")
                     target.product_url = f"https://www.audible.{self._auth.locale.domain}/pd/{product['asin']}"
 
@@ -63,6 +64,11 @@ class Audible(Amazon):
 
             target.exists = False
             return target
+
+    def get_custom_deals(self, product: dict) -> list[CustomDeal]:
+        # Stub until a live promotion's payload has been captured.
+        # Expect it in the price / plans response groups.
+        return []
 
     async def get_wishlist(self, config: Config) -> list[Book]:
         wishlist_books = []

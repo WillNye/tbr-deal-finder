@@ -4,7 +4,7 @@ import flet as ft
 
 from tbr_deal_finder.book import prune_retailer_deal_table
 from tbr_deal_finder.config import Config
-from tbr_deal_finder.retailer import RETAILER_MAP
+from tbr_deal_finder.retailer import RETAILER_MAP, WHISPERSYNC_HINT
 from tbr_deal_finder.tracked_books import reprocess_incomplete_tbr_books, clear_unknown_books
 from tbr_deal_finder.utils import get_duckdb_conn
 
@@ -103,6 +103,12 @@ class SettingsPage:
             visible=bool("Audible" in self.tracked_retailers),
         )
 
+        self.whispersync_hint = ft.Container(
+            content=ft.Text(WHISPERSYNC_HINT, size=12, color=ft.Colors.GREY_600),
+            margin=ft.margin.only(left=30),
+            visible=self._show_whispersync_hint(),
+        )
+
         # Tracked Retailers Section
         retailer_checkboxes = []
         for retailer in RETAILER_MAP.keys():
@@ -116,6 +122,7 @@ class SettingsPage:
             if retailer == "Audible":
                 # Audible Plus membership checkbox (indented to appear nested under Audible)
                 retailer_checkboxes.append(self.audible_plus_checkbox)
+                retailer_checkboxes.append(self.whispersync_hint)
 
         # Kindle Unlimited membership checkbox (indented to appear nested under Kindle)
         self.kindle_unlimited_checkbox = ft.Container(
@@ -319,9 +326,11 @@ class SettingsPage:
 
         if retailer == "Kindle":
             self.kindle_unlimited_checkbox.visible = is_checked
+            self.whispersync_hint.visible = self._show_whispersync_hint()
             self.app.page.update()
         elif retailer == "Audible":
             self.audible_plus_checkbox.visible = is_checked
+            self.whispersync_hint.visible = self._show_whispersync_hint()
             self.app.page.update()
         elif retailer in ("Kobo E-Book", "Kobo Audiobook"):
             # Either Kobo retailer being tracked shows the shared Kobo Plus toggle.
@@ -330,6 +339,9 @@ class SettingsPage:
             )
             self.app.page.update()
 
+
+    def _show_whispersync_hint(self) -> bool:
+        return "Audible" in self.tracked_retailers and "Kindle" not in self.tracked_retailers
 
     def update_max_price(self, e):
         """Update max price value"""

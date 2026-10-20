@@ -365,7 +365,7 @@ class BookDetailsPage:
         query = """
         SELECT DISTINCT format
         FROM retailer_deal
-        WHERE title = ? AND authors = ? AND deleted IS NOT TRUE
+        WHERE title = ? AND authors = ? AND deleted IS NOT TRUE AND is_internal IS NOT TRUE
         """
         
         try:
@@ -481,6 +481,23 @@ class BookDetailsPage:
                 run_spacing=10,
                 alignment=ft.MainAxisAlignment.SPACE_EVENLY,
             )
+            # Details are too long for the narrow cards, so they're listed beneath them.
+            custom_deal_notes = [
+                ft.Text(
+                    spans=[
+                        ft.TextSpan(
+                            f"{deal.retailer} - {deal.custom_deal_type}: ",
+                            ft.TextStyle(weight=ft.FontWeight.BOLD),
+                        ),
+                        ft.TextSpan(deal.custom_deal_details or ""),
+                    ],
+                    size=13,
+                )
+                for deal in self.current_deals
+                if deal.custom_deal_type
+            ]
+            if custom_deal_notes:
+                body = ft.Column([body, *custom_deal_notes], spacing=10)
 
         return ft.Container(
             content=ft.Column([
@@ -512,6 +529,18 @@ class BookDetailsPage:
                 color=ft.Colors.GREEN
             ),
             ft.Text(f"was {deal.list_price_string()}", color=ft.Colors.GREY_500),
+        ]
+        if deal.custom_deal_type:
+            card_items.append(
+                ft.Text(
+                    deal.custom_deal_type,
+                    color=ft.Colors.AMBER,
+                    weight=ft.FontWeight.BOLD,
+                    size=12,
+                    text_align=ft.TextAlign.CENTER,
+                )
+            )
+        card_items += [
             ft.Container(
                 content=ft.Text(
                     f"{discount}% OFF",
@@ -632,7 +661,7 @@ class BookDetailsPage:
         query = """
         SELECT * exclude(deal_id)
         FROM retailer_deal
-        WHERE title = ? AND authors = ? AND format = ?
+        WHERE title = ? AND authors = ? AND format = ? AND is_internal IS NOT TRUE
         QUALIFY ROW_NUMBER() OVER (PARTITION BY retailer ORDER BY timepoint DESC) = 1 
         AND deleted IS NOT TRUE
         ORDER BY current_price ASC
@@ -657,7 +686,7 @@ class BookDetailsPage:
         SELECT retailer, list_price, current_price, timepoint
         FROM retailer_deal
         WHERE title = ? AND authors = ? AND format = ? 
-        AND timepoint >= ?
+        AND timepoint >= ? AND is_internal IS NOT TRUE
         ORDER BY timepoint ASC
         """
         

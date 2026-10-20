@@ -8,7 +8,7 @@ from tbr_deal_finder.gui.widgets import book_tile_card, cover_image_for_format, 
 
 class LatestDealsPage(BaseDealsPage):
     def __init__(self, app):
-        super().__init__(app, 9)
+        super().__init__(app)
 
     @staticmethod
     def page_id():
@@ -30,9 +30,6 @@ class LatestDealsPage(BaseDealsPage):
     def build(self):
         """Build the latest deals page with custom header"""
         self.app.update_last_run_time()
-        
-        # Custom header with run button
-        header = self.build_header()
         
         # Progress indicator (hidden by default)
         self.progress_container = ft.Container(
@@ -59,21 +56,20 @@ class LatestDealsPage(BaseDealsPage):
         )
 
         self.load_items()
-        
+
         # Results section
         results = self.build_results()
         
         return ft.Column([
-            ft.Text(self.get_page_title(), size=24, weight=ft.FontWeight.BOLD),
-            header,
+            self.build_title_row(),
             self.progress_container,
             search_controls,
             self.loading_container,
             results
         ], spacing=20, scroll=ft.ScrollMode.AUTO)
 
-    def build_header(self):
-        """Build the header with run button and status"""
+    def get_header_actions(self) -> list[ft.Control]:
+        """Run button, info and last-run status, shown beside the page title"""
         can_run = self.can_run_latest_deals()
         last_run_time = self.app.get_last_run_time()
 
@@ -109,18 +105,10 @@ class LatestDealsPage(BaseDealsPage):
             on_click=self.show_info_dialog
         )
         
-        return ft.Container(
-            content=ft.Column([
-                ft.Row([
-                    run_button,
-                    info_button
-                ], alignment=ft.MainAxisAlignment.START),
-                ft.Text(status_text, color=status_color, size=14)
-            ], spacing=10),
-            padding=20,
-            border=ft.border.all(1, ft.Colors.OUTLINE),
-            border_radius=8
-        )
+        return [
+            ft.Row([run_button, info_button], spacing=0, tight=True),
+            ft.Text(status_text, color=status_color, size=14),
+        ]
 
     def build_results(self):
         """Build the results section using base class pagination"""
@@ -157,14 +145,18 @@ class LatestDealsPage(BaseDealsPage):
         """Create a tile for a single deal"""
         price_text = f"{deal.current_price_string()} ({deal.discount()}% off)"
 
+        info = [
+            ft.Text(deal.retailer, weight=ft.FontWeight.BOLD, size=12, color=ft.Colors.BLUE_400),
+            ft.Text(truncate_title(deal.title, 50), weight=ft.FontWeight.BOLD),
+            ft.Text(f"by {deal.authors}", color=ft.Colors.GREY_600),
+            ft.Text(price_text, color=ft.Colors.GREEN, weight=ft.FontWeight.BOLD),
+        ]
+        if custom_deal := self.custom_deal_label(deal):
+            info.append(custom_deal)
+
         return book_tile_card(
             cover_image_for_format(deal.image_url, deal.format),
-            [
-                ft.Text(deal.retailer, weight=ft.FontWeight.BOLD, size=12, color=ft.Colors.BLUE_400),
-                ft.Text(truncate_title(deal.title, 50), weight=ft.FontWeight.BOLD),
-                ft.Text(f"by {deal.authors}", color=ft.Colors.GREY_600),
-                ft.Text(price_text, color=ft.Colors.GREEN, weight=ft.FontWeight.BOLD),
-            ],
+            info,
             overlay=self._deal_actions_overlay(deal),
             on_click=lambda e, book=deal: self.app.show_book_details(book, format_type=book.format),
         )
@@ -292,6 +284,7 @@ class LatestDealsPage(BaseDealsPage):
         self.current_page = 0
         self.search_query = ""
         self.format_filter = "All"
+        self.reset_custom_deal_filter()
         
         # Reset UI elements if they exist
         if hasattr(self, 'search_field'):

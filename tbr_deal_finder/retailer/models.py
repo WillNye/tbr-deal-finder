@@ -6,7 +6,7 @@ from typing import Optional, Union
 
 import aiohttp
 
-from tbr_deal_finder.book import Book, BookFormat
+from tbr_deal_finder.book import Book, BookFormat, CustomDeal
 from tbr_deal_finder.config import Config
 from tbr_deal_finder.utils import get_data_dir
 
@@ -95,6 +95,13 @@ class Retailer(abc.ABC):
             Book: Updated book object with pricing and availability
             """
         raise NotImplementedError
+
+    async def prefetch(self, config: Config, books: list[Book]):
+        """Optionally fetch data for many books at once before get_book is called for each."""
+
+    def get_custom_deals(self, product: dict) -> list[CustomDeal]:
+        """Non-standard deals (e.g. 2 books for 1 credit) found in a product payload from get_book."""
+        return []
 
     async def get_wishlist(self, config: Config) -> list[Book]:
         raise NotImplementedError

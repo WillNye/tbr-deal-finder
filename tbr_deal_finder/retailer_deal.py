@@ -2,10 +2,11 @@ import asyncio
 import copy
 from collections import defaultdict
 from datetime import timedelta
+from typing import Optional
 
 import pandas as pd
 
-from tbr_deal_finder.book import Book, get_active_deals, BookFormat
+from tbr_deal_finder.book import Book, CustomDeal, get_active_deals, BookFormat
 from tbr_deal_finder.book_match import BookMatchIndex
 from tbr_deal_finder.config import Config
 from tbr_deal_finder.owned_books import get_owned_books
@@ -17,13 +18,15 @@ from tbr_deal_finder.tracked_books import (
 )
 from tbr_deal_finder.retailer import RETAILER_MAP
 from tbr_deal_finder.retailer.models import Retailer
-from tbr_deal_finder.utils import get_duckdb_conn, echo_info, echo_err
+from tbr_deal_finder.utils import get_duckdb_conn, echo_info, echo_err, float_to_currency
 
 
 # Write a fresh row for an unchanged price if the last stored record is at least
 # this old, so the price-history chart has continuous data points instead of a
 # single record that never renders a line.
 HEARTBEAT_INTERVAL = timedelta(days=7)
+
+WHISPERSYNC_DEAL_TYPE = "Whispersync"
 
 
 def update_retailer_deal_table(config: Config, new_deals: list[Book]):
@@ -36,7 +39,8 @@ def update_retailer_deal_table(config: Config, new_deals: list[Book]):
     # This could be done using a temp table for the new deals, but that feels like overkill.
     # I can't imagine there's ever going to be more than 5,000 books in someone's TBR.
     # If it were any larger, we'd have bigger problems.
-    active_deal_map = {deal.deal_id: deal for deal in get_active_deals()}
+    # Internal deals are included so unchanged ones aren't re-inserted every run.
+    active_deal_map = {deal.deal_id: deal for deal in get_active_deals(include_internal=True)}
     # Dirty trick to ensure uniqueness in request
     new_deals = list({nd.deal_id: nd for nd in new_deals}.values())
     df_data = []
@@ -47,8 +51,9 @@ def update_retailer_deal_table(config: Config, new_deals: list[Book]):
             price_changed = deal.current_price != active_deal.current_price
             stale = (deal.timepoint - active_deal.timepoint) >= HEARTBEAT_INTERVAL
             product_url_changed = deal.product_url != active_deal.product_url
-            if price_changed or stale or product_url_changed:
-                deal.is_heartbeat = not price_changed
+            custom_deal_changed = _custom_deal_key(deal) != _custom_deal_key(active_deal)
+            if price_changed or stale or product_url_changed or custom_deal_changed:
+                deal.is_heartbeat = not (price_changed or custom_deal_changed)
                 df_data.append(deal.dict())
 
             active_deal_map.pop(deal.deal_id)
@@ -62,6 +67,10 @@ def update_retailer_deal_table(config: Config, new_deals: list[Book]):
         db_conn.register("_df", df)
         db_conn.execute("INSERT INTO retailer_deal BY NAME SELECT * FROM _df;")
         db_conn.unregister("_df")
+
+
+def _custom_deal_key(deal: Book) -> tuple:
+    return deal.custom_deal_type, deal.custom_deal_details, deal.override_price_enforcement
 
 
 async def _get_books(
@@ -99,11 +108,9 @@ async def _get_books(
         book.retailer = retailer.name
         book.format = retailer.format
 
-    tasks = [
-        retailer.get_book(config, book, semaphore)
-        for book in books
-        if book.deal_id not in ignored_deal_ids
-    ]
+    books = [book for book in books if book.deal_id not in ignored_deal_ids]
+    await retailer.prefetch(config, books)
+    tasks = [retailer.get_book(config, book, semaphore) for book in books]
 
     results = await asyncio.gather(*tasks)
     for book in results:
@@ -158,30 +165,72 @@ def _apply_proper_list_prices(books: list[Book]):
             book.list_price = max(book.current_price, list_price)
 
 
+def _whispersync_ebook(
+    config: Config,
+    audiobook: Book,
+    owned_kindle_books: BookMatchIndex,
+    kindle_books: BookMatchIndex,
+) -> Optional[tuple[float, str]]:
+    """The cost of getting the Kindle ebook for Whispersync and how to get it, if known."""
+    if audiobook in owned_kindle_books:
+        return 0, "You already have the Kindle ebook, so add the Audible narration at the Whispersync price."
+
+    kindle_matches = kindle_books.matches(audiobook)
+    if not kindle_matches:
+        return None
+
+    if config.is_kindle_unlimited_member and any(k.alt_price == 0 for k in kindle_matches):
+        return 0, (
+            "The Kindle ebook is free with Kindle Unlimited. "
+            "Borrow it (add it to your library), then add the Audible narration at the Whispersync price."
+        )
+
+    ebook_price = min(k.current_price for k in kindle_matches)
+    return ebook_price, (
+        f"Buy the Kindle ebook ({float_to_currency(ebook_price)}), "
+        f"then add the Audible narration ({float_to_currency(audiobook.alt_price)}) at the Whispersync price. "
+        "The price shown includes both."
+    )
+
+
 async def _apply_proper_current_price_audible(config: Config, books: list[Book]):
+    """Price Audible books at Whispersync for Voice pricing when it's the better deal.
+
+    With the Kindle ebook, Audible sells the narration at a discounted upsell price (alt_price).
+    The ebook is free when owned or borrowed with Kindle Unlimited, so that price applies whenever
+    it's cheaper. When the ebook has to be bought, the ebook + narration total is used only if it
+    falls within the user's max price.
+    """
     # Loosely matched for the same reason owned-book suppression is: the Kindle
     # and Audible editions of a book rarely agree on the author list.
-    whispersync_books = BookMatchIndex(
+    owned_kindle_books = BookMatchIndex(
         (
             b for b in await get_owned_books(config)
             if b.retailer == "Kindle"
         ),
         label="whispersync",
     )
-
-    if config.is_kindle_unlimited_member:
-        for b in books:
-            if b.retailer == "Kindle" and b.alt_price == 0:
-                whispersync_books.add(b)
+    kindle_books = BookMatchIndex(
+        (b for b in books if b.retailer == "Kindle"),
+        label="whispersync ebook",
+    )
 
     for b in books:
-        if (
-            b.retailer == "Audible"
-            and b.alt_price is not None
-            and b.current_price > b.alt_price
-            and b in whispersync_books
-        ):
-            b.current_price = b.alt_price
+        if b.retailer != "Audible" or b.alt_price is None:
+            continue
+
+        ebook = _whispersync_ebook(config, b, owned_kindle_books, kindle_books)
+        if not ebook:
+            continue
+
+        ebook_price, details = ebook
+        total = round(ebook_price + b.alt_price, 2)
+        if total >= b.current_price or (ebook_price and total > config.max_price):
+            continue
+
+        b.current_price = total
+        # Whispersync is what the shown price reflects, so it replaces any retailer promotion.
+        b.set_custom_deal([CustomDeal(WHISPERSYNC_DEAL_TYPE, details)])
 
 
 async def _apply_proper_current_price_kindle(config: Config, books: list[Book]):

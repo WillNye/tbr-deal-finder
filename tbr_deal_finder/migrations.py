@@ -130,6 +130,15 @@ _MIGRATIONS = [
             ALTER TABLE retailer_deal ADD COLUMN product_url VARCHAR;
             """
     ),
+    TableMigration(
+        version=7,
+        table_name="retailer_deal",
+        sql="""
+            ALTER TABLE retailer_deal ADD COLUMN custom_deal_type VARCHAR;
+            ALTER TABLE retailer_deal ADD COLUMN custom_deal_details VARCHAR;
+            ALTER TABLE retailer_deal ADD COLUMN override_price_enforcement BOOLEAN DEFAULT FALSE;
+            """
+    ),
 ]
 
 

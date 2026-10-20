@@ -22,6 +22,7 @@ from tbr_deal_finder.retailer.models import AioHttpSession, Retailer, GuiAuthCon
 from tbr_deal_finder.book import (
     Book,
     BookFormat,
+    CustomDeal,
     get_normalized_authors,
     get_normalized_title,
     is_matching_authors,
@@ -579,6 +580,8 @@ class KoboEbook(AioHttpSession, Retailer):
                 if member_price is not None:
                     target.alt_price = member_price
 
+                target.set_custom_deal(self.get_custom_deals(book))
+
                 if image_id := book.get("ImageId"):
                     target.image_url = _kobo_cover_url(image_id)
 
@@ -715,3 +718,8 @@ class KoboAudiobook(KoboEbook):
     @property
     def format(self) -> BookFormat:
         return BookFormat.AUDIOBOOK
+
+    def get_custom_deals(self, product: dict) -> list[CustomDeal]:
+        # Stub until a live promotion's payload has been captured.
+        # Expect it alongside Price on the Audiobook product metadata.
+        return []
